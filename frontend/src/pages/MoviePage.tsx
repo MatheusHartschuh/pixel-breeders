@@ -8,6 +8,8 @@ import { EmptyState } from "../components/layout/EmptyState";
 import { Page } from "../components/layout/Page";
 import { MovieDetailSkeleton, MovieDetailView } from "../components/movie/MovieDetailView";
 import { Button } from "../components/ui/Button";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { ptBR } from "../i18n";
 import type { MovieDetail } from "../types";
 
 export function MoviePage() {
@@ -24,16 +26,17 @@ export function MoviePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
+  const [isDeletePromptOpen, setIsDeletePromptOpen] = useState(false);
 
   useEffect(() => {
-    document.title = movie ? `${movie.title} | Pixel Breeders` : "Pixel Breeders | Filme";
+    document.title = movie ? ptBR.movie.documentTitle(movie.title) : ptBR.movie.documentTitle();
   }, [movie]);
 
   useEffect(() => {
     if (Number.isNaN(movieId)) {
       setMovie(null);
       setSelectedRating(0);
-      setError("ID do filme inválido.");
+      setError(ptBR.movie.fallback.invalidId);
       setLoading(false);
       return;
     }
@@ -60,7 +63,7 @@ export function MoviePage() {
           return;
         }
 
-        setError(requestError instanceof Error ? requestError.message : "Falha ao carregar o filme");
+        setError(requestError instanceof Error ? requestError.message : ptBR.common.feedback.genericLoadMovieError);
         setLoading(false);
       });
 
@@ -94,9 +97,9 @@ export function MoviePage() {
       const savedRating = movie.user_rating ? await updateRating(movie.id, selectedRating) : await createRating(payload);
 
       setMovie((current) => (current ? { ...current, user_rating: savedRating.rating } : current));
-      setStatusMessage("Avaliação salva com sucesso.");
+      setStatusMessage(ptBR.movie.copies.saveSuccess);
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Não foi possível salvar a avaliação";
+      const message = requestError instanceof Error ? requestError.message : ptBR.common.feedback.genericSaveRatingError;
       if (isUnauthorizedError(requestError)) {
         logout();
         setIsAuthPromptOpen(true);
@@ -122,6 +125,14 @@ export function MoviePage() {
       return;
     }
 
+    setIsDeletePromptOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!movie?.user_rating) {
+      return;
+    }
+
     setSaving(true);
     setError("");
     setStatusMessage("");
@@ -130,11 +141,13 @@ export function MoviePage() {
       await deleteRating(movie.id);
       setMovie((current) => (current ? { ...current, user_rating: null } : current));
       setSelectedRating(0);
-      setStatusMessage("Avaliação removida.");
+      setStatusMessage(ptBR.movie.copies.removedSuccess);
+      setIsDeletePromptOpen(false);
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Não foi possível remover a avaliação";
+      const message = requestError instanceof Error ? requestError.message : ptBR.common.feedback.genericDeleteRatingError;
       if (isUnauthorizedError(requestError)) {
         logout();
+        setIsDeletePromptOpen(false);
         setIsAuthPromptOpen(true);
         setMovie((current) => (current ? { ...current, user_rating: null } : current));
         setSelectedRating(0);
@@ -155,13 +168,13 @@ export function MoviePage() {
     return (
       <Page>
         <EmptyState
-          title="Não foi possível abrir o filme"
+          title={ptBR.movie.fallback.unavailable}
           description={error}
           titleAs="h1"
           size="large"
           action={
             <Button variant="primary" to="/">
-              Voltar
+              {ptBR.common.buttons.back}
             </Button>
           }
         />
@@ -173,13 +186,13 @@ export function MoviePage() {
     return (
       <Page>
         <EmptyState
-          title="Filme indisponível"
-          description="Tente novamente em instantes."
+          title={ptBR.movie.fallback.unavailable}
+          description={ptBR.movie.fallback.tryAgain}
           titleAs="h1"
           size="large"
           action={
             <Button variant="primary" to="/">
-              Voltar
+              {ptBR.common.buttons.back}
             </Button>
           }
         />
@@ -207,6 +220,16 @@ export function MoviePage() {
         nextPath={nextPath}
         contextLabel={movie ? movie.title : undefined}
         onClose={() => setIsAuthPromptOpen(false)}
+      />
+      <ConfirmDialog
+        open={isDeletePromptOpen}
+        title={ptBR.common.dialogs.removeRatingTitle}
+        description={ptBR.common.dialogs.removeRatingDescription}
+        confirmLabel={ptBR.movie.buttons.remove}
+        cancelLabel={ptBR.common.buttons.cancel}
+        loading={saving}
+        onConfirm={confirmDelete}
+        onCancel={() => setIsDeletePromptOpen(false)}
       />
     </>
   );

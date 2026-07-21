@@ -19,7 +19,7 @@ def test_search_and_movie_detail_fallback_to_fixture_source(client, monkeypatch)
 
 
 def test_search_and_movie_detail_use_tmdb_source_when_api_succeeds(client, monkeypatch):
-    def fake_search_movies(*, query, page=1, year=None, genre_id=None):
+    def fake_search_movies(*, query, page=1, year=None, genre_id=None, sort="relevance"):
         return {
             "items": [
                 {

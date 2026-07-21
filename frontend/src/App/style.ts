@@ -1,7 +1,9 @@
+import { ptBR } from "../i18n";
+
 export const APP_BRAND = {
-  mark: "PB",
-  title: "Pixel Breeders",
-  subtitle: "Arquivo de cinema",
+  mark: ptBR.app.brand.mark,
+  title: ptBR.app.brand.title,
+  subtitle: ptBR.app.brand.subtitle,
 } as const;
 
 type AppNavItem = {
@@ -11,6 +13,7 @@ type AppNavItem = {
 };
 
 export const APP_NAV_ITEMS: AppNavItem[] = [
-  { to: "/", label: "Busca", end: true },
-  { to: "/rated", label: "Avaliados" },
+  { to: "/", label: ptBR.app.nav.search, end: true },
+  { to: "/rated", label: ptBR.app.nav.rated },
+  { to: "/settings", label: ptBR.app.nav.settings },
 ];

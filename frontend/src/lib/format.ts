@@ -1,6 +1,8 @@
+import { ptBR } from "../i18n";
+
 export function formatReleaseDate(value?: string | null): string {
   if (!value) {
-    return "Data indisponível";
+    return ptBR.common.date.unavailable;
   }
 
   const date = new Date(`${value}T00:00:00`);
@@ -17,7 +19,7 @@ export function formatReleaseDate(value?: string | null): string {
 
 export function formatReleaseYear(value?: string | null): string {
   if (!value) {
-    return "Ano indisponível";
+    return ptBR.common.date.yearUnavailable;
   }
 
   const date = new Date(`${value}T00:00:00`);
@@ -30,7 +32,7 @@ export function formatReleaseYear(value?: string | null): string {
 
 export function formatRating(value?: number | null): string {
   if (typeof value !== "number") {
-    return "Sem nota";
+    return ptBR.common.labels.noRating;
   }
 
   return `${value}/5`;
@@ -46,7 +48,7 @@ export function formatVoteAverage(value?: number | null): string {
 
 export function formatEvaluationDate(value?: string | null): string {
   if (!value) {
-    return "Data indisponivel";
+    return ptBR.common.date.unavailable;
   }
 
   const date = new Date(value);

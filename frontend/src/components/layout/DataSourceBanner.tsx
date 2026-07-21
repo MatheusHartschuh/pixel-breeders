@@ -1,4 +1,5 @@
 import type { DataSource } from "../../types";
+import { ptBR } from "../../i18n";
 
 interface DataSourceBannerProps {
   source: DataSource | null | undefined;
@@ -12,8 +13,8 @@ export function DataSourceBanner({ source, className = "" }: DataSourceBannerPro
 
   return (
     <aside className={`data-source-banner ${className}`.trim()} role="status" aria-live="polite">
-      <strong>Exibindo dados de exemplo</strong>
-      <p>configure <code>TMDB_API_KEY</code> para usar a API real do TMDB.</p>
+      <strong>{ptBR.banner.fixtureTitle}</strong>
+      <p>{ptBR.banner.fixtureDescription}</p>
     </aside>
   );
 }

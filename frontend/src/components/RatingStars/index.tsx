@@ -1,4 +1,5 @@
-import { getRatingButtonClassName, getRatingStarsClassName, STAR_COUNT, STAR_LABELS } from "./style";
+import { getRatingButtonClassName, getRatingStarsClassName, STAR_COUNT } from "./style";
+import { ptBR } from "../../i18n";
 
 interface RatingStarsProps {
   value: number;
@@ -7,7 +8,7 @@ interface RatingStarsProps {
   label?: string;
 }
 
-export function RatingStars({ value, onChange, size = "md", label = "Avaliação" }: RatingStarsProps) {
+export function RatingStars({ value, onChange, size = "md", label = ptBR.ratingStars.label }: RatingStarsProps) {
   const interactive = typeof onChange === "function";
 
   return (
@@ -23,7 +24,7 @@ export function RatingStars({ value, onChange, size = "md", label = "Avaliação
               key={starValue}
               type="button"
               className={getRatingButtonClassName(true, filled)}
-              aria-label={`${STAR_LABELS[index]} (${starValue} de 5)`}
+              aria-label={`${ptBR.ratingStars.ariaLabels[index]} (${starValue} de 5)`}
               aria-pressed={filled}
               onClick={() => onChange(starValue)}
             >

@@ -7,7 +7,7 @@ from app.core.security import get_current_user_optional
 from app.db import get_db
 from app.models import Rating, User
 from app.schemas import MovieSummary, SearchResponse
-from app.services.tmdb import tmdb_client
+from app.services.tmdb import SearchSortMode, tmdb_client
 
 router = APIRouter(tags=["search"])
 
@@ -18,10 +18,11 @@ def search_movies(
     page: int = Query(default=1, ge=1),
     year: int | None = Query(default=None, ge=1900, le=2100),
     genre_id: int | None = Query(default=None, ge=1),
+    sort: SearchSortMode = Query(default="relevance"),
     current_user: User | None = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ) -> SearchResponse:
-    response = tmdb_client.search_movies(query=query, page=page, year=year, genre_id=genre_id)
+    response = tmdb_client.search_movies(query=query, page=page, year=year, genre_id=genre_id, sort=sort)
     ratings = {}
     if current_user is not None:
         ratings = {

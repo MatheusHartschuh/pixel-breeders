@@ -6,6 +6,9 @@ import { Button } from "../components/ui/Button";
 import { Field } from "../components/ui/Field";
 import { useAuth } from "../auth/AuthProvider";
 import { getSafeRedirectPath } from "../lib/navigation";
+import { ptBR } from "../i18n";
+
+const LOGIN = ptBR.auth.login;
 
 function getNextPath(search: string): string {
   return getSafeRedirectPath(new URLSearchParams(search).get("next"));
@@ -23,7 +26,7 @@ export function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    document.title = "Pixel Breeders | Entrar";
+    document.title = LOGIN.documentTitle;
   }, []);
 
   if (user) {
@@ -42,7 +45,7 @@ export function LoginPage() {
       });
       navigate(nextPath, { replace: true });
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Não foi possível entrar");
+      setError(requestError instanceof Error ? requestError.message : ptBR.common.feedback.genericLoginError);
     } finally {
       setLoading(false);
     }
@@ -50,52 +53,52 @@ export function LoginPage() {
 
   return (
     <AuthPageLayout
-      eyebrow="Acesso"
-      title="Entre para salvar suas avaliações"
-      description="O login libera as rotas protegidas do projeto e mantém suas notas vinculadas à sua conta em todos os dispositivos."
+      eyebrow={LOGIN.eyebrow}
+      title={LOGIN.title}
+      description={LOGIN.description}
       introActions={
         <>
           <Button variant="secondary" to="/">
-            Voltar para a busca
+            {LOGIN.introBackToSearch}
           </Button>
           <Button variant="ghost" to={`/register?next=${encodeURIComponent(nextPath)}`}>
-            Criar conta
+            {LOGIN.introCreateAccount}
           </Button>
         </>
       }
-      cardTitle="Entrar"
-      cardDescription="Use seu nome de usuário e senha para continuar."
+      cardTitle={LOGIN.cardTitle}
+      cardDescription={LOGIN.cardDescription}
     >
       <form className="auth-form" onSubmit={handleSubmit}>
-        <Field variant="auth" label="Usuário">
+        <Field variant="auth" label={LOGIN.usernameLabel}>
           <input
             className="auth-form__input"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
-            placeholder="ex: Nome"
+            placeholder={LOGIN.usernamePlaceholder}
             required
           />
         </Field>
 
-        <Field variant="auth" label="Senha">
+        <Field variant="auth" label={LOGIN.passwordLabel}>
           <input
             className="auth-form__input"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="current-password"
-            placeholder="Sua senha"
+            placeholder={LOGIN.passwordPlaceholder}
             required
           />
         </Field>
 
         <div className="auth-form__actions">
           <Button variant="primary" type="submit" disabled={loading}>
-            {loading ? "Entrando..." : "Entrar"}
+            {loading ? LOGIN.submitLoading : LOGIN.submitIdle}
           </Button>
           <Button variant="secondary" to={`/register?next=${encodeURIComponent(nextPath)}`}>
-            Criar conta
+            {LOGIN.introCreateAccount}
           </Button>
         </div>
 

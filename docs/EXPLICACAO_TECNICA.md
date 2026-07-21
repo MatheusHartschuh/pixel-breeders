@@ -1,229 +1,100 @@
 # Explicação Técnica da Aplicação
 
-Este documento descreve, em detalhes, como a aplicação Pixel Breeders funciona hoje, com foco em:
-
-- consumo de API
-- gerenciamento de estado no backend
-- persistência e modelagem de dados
-- tratamento de erros
-- Docker e execução do projeto
-- qualidade geral da implementação
-
-O objetivo é deixar claro o fluxo real do código, não apenas a intenção do teste.
+Este documento descreve como a aplicação funciona de verdade, do ponto de vista de arquitetura, fluxo de dados e decisões de implementação. A intenção aqui é explicar o comportamento atual do repositório, não apenas a ideia do projeto.
 
 ## 1. Visão geral da arquitetura
 
 A solução é dividida em dois blocos principais:
 
-- `frontend`, construído em React + TypeScript
+- `frontend`, construído em React + TypeScript + Vite
 - `backend`, construído em FastAPI + SQLAlchemy
 
-O backend tem duas responsabilidades:
+O backend concentra três responsabilidades:
 
-1. servir a API própria da aplicação, usada pelo frontend
-2. integrar com a API pública do TMDB para pesquisa e detalhes de filmes
+1. servir a API própria da aplicação
+2. integrar com a TMDB
+3. proteger e persistir os dados de autenticação e avaliações
 
-O frontend não conversa diretamente com o TMDB. Toda a comunicação externa passa pelo backend, o que centraliza autenticação, cache, normalização de dados e tratamento de falhas.
+O frontend não chama a TMDB diretamente. Toda a integração externa passa pelo backend. Isso simplifica o controle de autenticação, padroniza os dados recebidos e permite um fallback local quando a TMDB não está disponível.
 
 ### Fluxo resumido
 
 1. O usuário pesquisa um filme no frontend.
-2. O frontend chama `GET /api/search`.
-3. O backend consulta o TMDB ou os dados locais de fallback.
-4. O backend normaliza a resposta e devolve um formato estável para o frontend.
+2. A página principal faz debounce da digitação e chama `GET /api/search`.
+3. O backend decide se usa a TMDB real ou os fixtures locais.
+4. O backend normaliza o retorno e devolve um formato estável para o frontend.
 5. Ao abrir um filme, o frontend chama `GET /api/movies/{movie_id}`.
-6. O backend busca detalhes e elenco no TMDB, ou no fallback local.
-7. Se o usuário estiver autenticado, o backend cruza o filme com as avaliações do usuário e injeta `user_rating` na resposta.
-8. As avaliações são persistidas no banco e acessadas por rotas protegidas com JWT.
+6. O backend busca detalhes e elenco, ou usa os dados locais.
+7. Se houver token válido, o backend injeta `user_rating` nas respostas públicas.
+8. As avaliações são persistidas em banco e acessadas por rotas protegidas com JWT.
 
-## 2. Consumo de API
+## 2. Backend
 
-### 2.1. Consumo da API interna no frontend
+### 2.1. Configuração e inicialização
 
-O frontend centraliza as chamadas HTTP em `frontend/src/api.ts`.
+As configurações ficam em `backend/app/core/config.py`. A aplicação lê variáveis do `.env` local, com defaults razoáveis para desenvolvimento.
 
-Essa camada faz algumas coisas importantes:
+Alguns exemplos de comportamento padrão:
 
-- adiciona o prefixo `/api` em todas as requisições
-- injeta o token JWT no header `Authorization` quando existe sessão salva
-- normaliza erros vindos do backend para uma mensagem amigável
-- trata `204 No Content` sem tentar fazer `response.json()`
+- `DATABASE_URL` aponta para SQLite fora do Docker
+- `TMDB_API_KEY` é opcional
+- `JWT_SECRET_KEY` e `JWT_ALGORITHM` controlam a assinatura do token
+- `TMDB_CACHE_TTL_SECONDS` e `TMDB_CACHE_MAX_ENTRIES` controlam o cache em memória
 
-O wrapper principal é a função `request<T>()`. Ele:
+Em `backend/app/main.py`, a aplicação:
 
-1. lê o token salvo em `localStorage`
-2. monta os headers
-3. faz a requisição com `fetch`
-4. se a resposta não for `ok`, lê a mensagem de erro e lança `Error`
-5. converte a resposta em JSON quando houver corpo
+- instancia o `FastAPI`
+- configura o CORS
+- cria as tabelas com `Base.metadata.create_all(bind=engine)` no startup
+- expõe `GET /health`
+- registra as rotas de busca, filmes, avaliações e autenticação
 
-Isso reduz repetição e mantém o comportamento uniforme em todas as chamadas.
+O uso de `create_all` deixa o MVP simples de subir, sem migrações formais. Em uma base maior, isso normalmente evoluiria para Alembic.
 
-### 2.2. Consumo da API própria
+### 2.2. Autenticação
 
-As funções exportadas em `frontend/src/api.ts` representam o contrato de uso da aplicação:
+A autenticação fica em `backend/app/core/security.py` e `backend/app/routers/auth.py`.
 
-- `searchMovies()`
-- `getMovie()`
-- `getMe()`
-- `login()`
-- `register()`
-- `listRatings()`
-- `createRating()`
-- `updateRating()`
-- `deleteRating()`
+O fluxo é o seguinte:
 
-O frontend usa essas funções diretamente nas páginas.
+- `normalize_username()` remove espaços e aplica `casefold()`
+- `hash_password()` usa `bcrypt` para gerar o hash
+- `verify_password()` compara a senha informada com o hash salvo
+- `create_access_token()` gera um JWT com `sub`, `username`, `type`, `iat` e `exp`
 
-### 2.3. Consumo do TMDB no backend
-
-O backend concentra a integração com o TMDB em `backend/app/services/tmdb.py`.
-
-O cliente `TmdbClient` faz a chamada ao serviço externo via `httpx`, com timeout configurável. Ele possui dois modos:
-
-- modo live, quando `TMDB_API_KEY` está configurada
-- modo fallback, quando a chave não existe ou quando o TMDB falha
-
-#### Busca de filmes
-
-Para busca, o serviço decide entre:
-
-- `/search/movie` quando existe texto de busca
-- `/discover/movie` quando a busca textual está vazia e o usuário está filtrando por ano e/ou gênero
-
-Depois da resposta da TMDB, o backend normaliza os campos e devolve um formato próprio:
-
-- `id`
-- `title`
-- `overview`
-- `release_date`
-- `poster_url`
-- `vote_average`
-- `genre_ids`
-
-Isso é importante porque o frontend não depende do shape bruto do TMDB.
-
-#### Detalhes do filme
-
-Para detalhes, o serviço chama `/movie/{movie_id}` com `append_to_response=credits`.
-
-Com isso, o backend consegue devolver:
-
-- dados do filme
-- elenco
-- pôster
-- nota média
-
-#### Fallback local
-
-Se a API do TMDB estiver indisponível ou se `TMDB_API_KEY` não estiver definida, a aplicação continua funcional usando `backend/app/fixtures.py`.
-
-Esse fallback é útil por três motivos:
-
-- mantém o MVP executável sem chave externa
-- evita bloqueio total em ambiente de avaliação
-- facilita demonstração local e desenvolvimento
-
-#### Cache da integração
-
-O cliente TMDB usa cache em memória com TTL, por processo.
-
-Características:
-
-- cache separado para busca e detalhes
-- expiração por tempo
-- limite máximo de entradas
-- cópias profundas para evitar efeitos colaterais acidentais
-- lock de thread para evitar corrida entre requisições concorrentes
-
-Na prática, isso reduz chamadas repetidas quando o usuário refaz a mesma busca, navega entre páginas ou reabre um filme já consultado.
-
-## 3. Gerenciamento de estado no backend
-
-No backend, o estado da aplicação é dividido em três camadas:
-
-### 3.1. Estado persistido
-
-É o estado durável, gravado no banco:
-
-- usuários
-- avaliações de filmes
-
-Esse é o estado que sobrevive a reinício da aplicação.
-
-### 3.2. Estado de sessão
-
-A aplicação usa JWT como mecanismo de autenticação.
-
-O token é gerado em `backend/app/core/security.py` com informações como:
-
-- `sub` com o id do usuário
-- `username`
-- `type = access`
-- `iat`
-- `exp`
-
-O backend não mantém sessão em memória no servidor. O estado da sessão fica no token e no banco. Isso simplifica a arquitetura e torna a autenticação stateless.
-
-### 3.3. Estado temporário
-
-Existem também estados transitórios, mantidos apenas em memória:
-
-- cache de respostas da TMDB
-- sessão de requisição via SQLAlchemy `SessionLocal`
-
-Esses estados não são a fonte da verdade da aplicação. Eles servem apenas para eficiência e para isolar cada request.
-
-### 3.4. Ciclo da sessão no backend
+O token é stateless. O backend não mantém sessão em memória.
 
 As rotas de autenticação funcionam assim:
 
 - `POST /api/auth/register`
   - valida `username` e `password`
   - normaliza o nome de usuário
-  - verifica se já existe conta com o mesmo nome
-  - salva o usuário com senha com hash bcrypt
-  - devolve token + dados públicos do usuário
+  - verifica duplicidade
+  - salva o usuário com senha hash
+  - devolve token + usuário público
 
 - `POST /api/auth/login`
   - normaliza o nome de usuário
-  - busca o usuário no banco
-  - valida a senha com bcrypt
-  - devolve token + dados públicos do usuário
+  - busca o usuário
+  - valida a senha
+  - devolve token + usuário público
 
 - `GET /api/auth/me`
-  - lê o token Bearer
-  - valida e decodifica o JWT
-  - carrega o usuário do banco
-  - devolve os dados públicos do usuário
+  - exige token Bearer válido
+  - retorna os dados públicos do usuário autenticado
 
-### 3.5. Relação entre backend e frontend no estado de login
+O backend tem dois helpers importantes:
 
-O frontend salva a sessão em `localStorage` por meio de `frontend/src/auth/storage.ts`.
+- `get_current_user()` para rotas protegidas, que retorna `401` se o token estiver ausente, inválido ou se o usuário não existir
+- `get_current_user_optional()` para rotas públicas que podem enriquecer a resposta se o token existir
 
-Na prática, o fluxo hoje é:
+Isso permite que `GET /api/search` e `GET /api/movies/{movie_id}` continuem públicos, mas tragam `user_rating` quando o usuário estiver autenticado.
 
-1. o token é salvo localmente
-2. o `AuthProvider` lê o conteúdo salvo e restaura o usuário imediatamente quando a aplicação sobe
-3. as requisições seguintes passam a enviar `Authorization: Bearer <token>`
+### 2.3. Modelo de dados
 
-O frontend não faz uma revalidação automática da sessão com `/api/auth/me` no boot.
-Em vez disso, ele assume o que está salvo localmente e depende das rotas protegidas para acusar token inválido ou expirado.
+Os modelos ORM estão em `backend/app/models.py`.
 
-Se uma rota protegida responder `401`, páginas como `MoviePage` e `RatedPage` chamam `logout()`, limpam o `localStorage` e retornam o usuário ao estado deslogado.
-
-## 4. Banco de dados
-
-### 4.1. Tecnologia e modelo
-
-O projeto usa SQLAlchemy ORM.
-
-Os modelos principais estão em `backend/app/models.py`:
-
-- `User`
-- `Rating`
-
-### 4.2. Tabela `users`
+#### `User`
 
 Campos principais:
 
@@ -235,10 +106,10 @@ Campos principais:
 Regras importantes:
 
 - `username` é único
-- `password` nunca é armazenada em texto puro
+- a senha nunca é armazenada em texto puro
 - o relacionamento com avaliações é `one-to-many`
 
-### 4.3. Tabela `ratings`
+#### `Rating`
 
 Campos principais:
 
@@ -257,261 +128,419 @@ Regras importantes:
 
 - existe `ForeignKey` para `users.id`
 - há `ondelete="CASCADE"`
-- existe `UniqueConstraint` em `(user_id, tmdb_id)`
+- existe `UniqueConstraint("user_id", "tmdb_id")`
 
-Esse índice único evita que o mesmo usuário crie avaliações duplicadas para o mesmo filme.
+Essa restrição garante que um usuário não crie duas avaliações para o mesmo filme.
 
-### 4.4. Estratégia de persistência
+### 2.4. Rotas de avaliações
 
-O banco é inicializado com `Base.metadata.create_all(bind=engine)` no startup da aplicação.
+As avaliações são o estado persistente central do projeto.
 
-Isso significa:
-
-- as tabelas são criadas automaticamente quando não existem
-- não há migrações formais com Alembic neste MVP
-
-Para um teste técnico ou MVP, isso acelera a entrega. Em um projeto maior, a evolução natural seria migrar para um fluxo de migrations versionadas.
-
-### 4.5. Banco no Docker e fallback local
-
-No Docker, o projeto usa PostgreSQL.
-
-Fora do Docker, o backend pode usar SQLite via `DATABASE_URL` local.
-
-Isso deixa o desenvolvimento mais simples, mas mantém o ambiente principal mais próximo de produção quando a aplicação sobe com `docker compose`.
-
-## 5. Rotas de avaliações
-
-As avaliações são o núcleo do estado do usuário.
-
-### `GET /api/ratings`
+#### `GET /api/ratings`
 
 - retorna apenas as avaliações do usuário autenticado
 - ordena por `updated_at desc`
 
-### `POST /api/ratings`
+#### `POST /api/ratings`
 
 - cria uma nova avaliação
-- ou atualiza a avaliação existente para o mesmo `tmdb_id`
+- ou atualiza a existente para o mesmo `tmdb_id`
 
-Esse endpoint funciona como um upsert manual: o backend procura uma avaliação existente para `(user_id, tmdb_id)` e, se encontrar, atualiza `title`, `poster_url`, `overview`, `release_date` e `rating` no mesmo registro.
+Essa rota funciona como um upsert manual. O backend procura um registro existente para `(user_id, tmdb_id)`; se encontrar, atualiza os dados do filme e a nota. Se não encontrar, cria um novo registro.
 
-A regra de unicidade também existe no banco, via `UniqueConstraint("user_id", "tmdb_id")`, então mesmo que o fluxo da API seja alterado no futuro, a integridade continua protegida.
+#### `PATCH /api/ratings/{tmdb_id}`
 
-Isso evita duplicidade silenciosa e mantém a lista do usuário consistente.
-
-Essa decisão evita duplicidade e simplifica a UX, porque o usuário pode salvar a nota sem precisar pensar se o filme já foi avaliado.
-
-### `PATCH /api/ratings/{tmdb_id}`
-
-- altera somente a nota
+- altera apenas a nota
 - mantém os demais dados do filme
 
-### `DELETE /api/ratings/{tmdb_id}`
+#### `DELETE /api/ratings/{tmdb_id}`
 
-- remove a avaliação do usuário
+- remove a avaliação do usuário autenticado
 
-Todas essas rotas exigem autenticação.
+As rotas protegidas usam `get_current_user()`, então um token inválido ou expirado derruba o acesso com `401`.
 
-## 6. Tratamento de erros
+### 2.5. Integração com a TMDB
 
-### 6.1. No backend
+A integração fica concentrada em `backend/app/services/tmdb.py`.
 
-O backend usa erros HTTP explícitos com mensagens em português, o que deixa a resposta previsível e fácil de exibir no frontend.
+O cliente `TmdbClient` usa `httpx.Client` síncrono com timeout configurável. Ele trabalha em dois modos:
 
-Exemplos de cenários:
+- live, quando `TMDB_API_KEY` existe
+- fallback, quando não existe chave ou quando a TMDB falha
 
-- `401 Unauthorized` quando o token é ausente, inválido ou expirado
-- `403/409` em conflitos de cadastro
+O serviço expõe dois canais principais:
+
+- busca de filmes
+- detalhes do filme
+
+#### Busca de filmes
+
+O método `search_movies()` decide a estratégia com base no contexto:
+
+- quando não existe `TMDB_API_KEY`, ele cai imediatamente nos fixtures locais
+- quando a query está vazia, ele usa `/discover/movie`
+- quando a query existe e a ordenação é de relevância, ele usa `/search/movie`
+- quando há filtros de gênero ou uma ordenação que exige consistência global, ele busca todas as páginas e ordena localmente
+
+Esse comportamento é importante porque a TMDB pagina os resultados, mas o projeto precisa permitir filtros e ordenações que façam sentido para a interface.
+
+As respostas são normalizadas para um formato próprio:
+
+- `id`
+- `title`
+- `overview`
+- `release_date`
+- `poster_url`
+- `vote_average`
+- `genre_ids`
+
+O frontend não depende do shape bruto da TMDB.
+
+#### Detalhes do filme
+
+`get_movie_details()` consulta `/movie/{movie_id}` com `append_to_response=credits`. Isso permite devolver, em uma única chamada:
+
+- dados do filme
+- elenco
+- pôster
+- nota média
+
+O elenco é limitado aos primeiros 10 membros para manter a interface legível.
+
+#### Cache
+
+O cliente usa cache em memória com TTL, separado para busca e detalhe.
+
+Características:
+
+- cache por processo
+- expiração por tempo
+- limite máximo de entradas
+- cópias profundas para evitar efeitos colaterais
+- `RLock` para concorrência segura entre requisições
+
+Na prática, isso reduz chamadas repetidas quando o usuário pesquisa a mesma coisa, troca de página ou reabre um filme já consultado.
+
+#### Fallback local
+
+Se a TMDB estiver indisponível ou a chave não estiver configurada, a aplicação continua funcionando com `backend/app/fixtures.py`.
+
+Os fixtures:
+
+- mantêm o MVP executável sem dependência externa
+- permitem demonstração local
+- cobrem busca, paginação, filtros e detalhes
+
+As respostas trazem `source` para deixar a origem explícita:
+
+- `source: "tmdb"` quando a API real respondeu com sucesso
+- `source: "fixture"` quando o backend usou os dados locais
+
+Esse campo também é usado pelo frontend para exibir um banner de aviso quando o fallback está ativo.
+
+### 2.6. Tratamento de erros
+
+O backend usa erros HTTP explícitos e mensagens em português.
+
+Exemplos:
+
+- `401 Unauthorized` quando o token está ausente, inválido ou expirou
 - `404` quando o filme ou a avaliação não existe
+- `409` quando há conflito de cadastro
 - validação de entrada via Pydantic para `username`, `password` e nota de 1 a 5
 
-Também existem mensagens customizadas para ajudar o usuário final a entender o problema sem precisar decodificar mensagens técnicas.
+O objetivo é manter o contrato previsível para o frontend.
 
-### 6.2. No frontend
+## 3. Frontend
 
-O frontend faz duas camadas de tratamento:
+### 3.1. Estrutura geral e navegação
 
-1. tratamento de resposta HTTP no wrapper `request()`
-2. tratamento visual nos componentes de página
+O app principal fica em `frontend/src/App/index.tsx`.
 
-O parser de erro em `frontend/src/api.ts` tenta extrair:
+Ele usa `BrowserRouter` e define as rotas:
 
-- `detail`
-- `message`
-- `msg`
+- `/` para busca
+- `/movie/:movieId` para detalhes do filme
+- `/rated` para a lista de filmes avaliados
+- `/settings` para preferências visuais
+- `/login` e `/register` para autenticação
 
-Isso permite que a aplicação mostre mensagens úteis mesmo quando o backend responde em formatos ligeiramente diferentes.
+A navegação lateral mostra o usuário atual quando há sessão salva e oferece links de login/cadastro quando não há.
 
-### 6.3. Cancelamento de requisições
+Os botões e links passam por um componente `Button` que funciona tanto como `<button>` quanto como `<Link>`, o que reduz duplicação de markup.
 
-As buscas de filmes usam `AbortController`.
+### 3.2. Sessão e camada de API
 
-Isso evita efeitos colaterais comuns como:
+A camada de API está em `frontend/src/api.ts`.
 
-- resposta antiga sobrescrever uma busca mais nova
-- atualizações de estado após desmontagem do componente
+Ela concentra todas as chamadas HTTP e faz três coisas importantes:
 
-Esse cuidado aparece principalmente na página principal, onde o usuário pode digitar rápido, mudar filtros ou alternar entre paginação e scroll infinito.
+1. adiciona o prefixo `/api`
+2. injeta o token JWT do `localStorage`, se existir
+3. normaliza mensagens de erro para algo legível no frontend
 
-### 6.4. Fallback em falhas externas
+O wrapper `request<T>()`:
 
-Se a TMDB falhar, o backend volta para os fixtures locais.
+- lê o token salvo
+- monta os headers
+- envia a requisição
+- trata `204 No Content` sem tentar parsear JSON
+- lê `detail`, `message` e `msg` ao montar a mensagem de erro
 
-Se uma avaliação protegida receber token inválido, a página que fez a chamada detecta o `401`, faz logout automático e limpa o estado local.
+Isso evita repetição em todas as páginas.
 
-Ou seja, o sistema tenta degradar de forma controlada em vez de quebrar de maneira abrupta.
+A sessão em si é gerenciada por `frontend/src/auth/AuthProvider.tsx` e `frontend/src/auth/storage.ts`.
 
-### 6.5. Cobertura automatizada
+Detalhes importantes:
 
-A base hoje tem uma suíte pequena, mas bem direcionada, em `backend/tests/`:
+- a sessão é lida de `localStorage` no estado inicial do provider
+- login e cadastro persistem `{ token, user }`
+- logout remove a sessão
+- `isCheckingSession` existe como API do provider, mas hoje não há um fluxo assíncrono de revalidação no boot
 
-- `test_fallback.py`
-  - valida que `GET /api/search` e `GET /api/movies/{id}` retornam `source: "fixture"` quando o TMDB não está disponível
-  - valida que as mesmas rotas retornam `source: "tmdb"` quando o cliente é mockado para responder com sucesso
-  - usa monkeypatch no singleton `tmdb_client`, sem chamada de rede real
+Ou seja, a aplicação restaura a sessão local imediatamente, e só limpa o estado se uma rota protegida responder `401`.
 
-- `test_ratings.py`
-  - cria um usuário autenticado com JWT válido
-  - faz `POST /api/ratings` duas vezes para o mesmo `tmdb_id`
-  - confirma que apenas uma linha persiste no banco
-  - confirma que a avaliação retornada por `GET /api/ratings` contém a nota mais recente
+Os utilitários de navegação em `frontend/src/lib/navigation.ts` evitam open redirect e loops entre `/login` e `/register`.
 
-Os testes usam `pytest`, `TestClient` do FastAPI e um banco SQLite isolado por teste, justamente para não depender do banco local ou do PostgreSQL do Docker.
+### 3.3. Página principal
 
-## 7. Docker
+`frontend/src/pages/HomePage.tsx` concentra a busca de filmes.
 
-### 7.1. Estrutura do `docker-compose.yml`
+O fluxo visual é este:
 
-O Compose sobe três serviços:
+- o usuário digita no campo de busca
+- o texto passa por debounce de 320 ms
+- o valor final vira `query`
+- a página chama `searchMovies()` com query, página, ano, gênero e ordenação
+
+Alguns detalhes importantes da interface:
+
+- a busca só dispara com 2 caracteres ou mais, exceto quando há filtros de ano/gênero
+- o ano aceita apenas dígitos e precisa ficar entre 1900 e 2100
+- o gênero é selecionado em um componente customizado de lista
+- a ordenação usa `SegmentedControl`
+- há dois modos de navegação:
+  - paginação
+  - scroll infinito
+
+A sincronização com a URL também é intencional:
+
+- `q` guarda a busca
+- `year` guarda o ano
+- `genre` guarda o gênero
+- `mode` guarda a navegação
+- `sort` guarda a ordenação
+
+Isso torna a tela compartilhável e fácil de revisar.
+
+#### Estado da busca
+
+A página trabalha com uma pequena máquina de estados:
+
+- `loading`
+- `typing`
+- `success`
+- `empty`
+- `error`
+
+Além disso, usa `AbortController` para cancelar requisições antigas quando o usuário muda a busca ou os filtros rapidamente.
+
+#### Paginação e scroll infinito
+
+Quando o modo é paginação, a interface usa `PaginationControls`.
+
+Quando o modo é scroll infinito:
+
+- um `IntersectionObserver` observa um sentinela no fim da lista
+- o botão "Carregar mais" fica disponível como fallback manual
+
+#### Banner de origem dos dados
+
+Se a resposta vem com `source: "fixture"`, a página mostra `DataSourceBanner`.
+
+Esse banner deixa explícito que os resultados exibidos estão vindo dos dados locais e não da TMDB real.
+
+#### Resumo dos filtros
+
+A página também monta tokens visuais com os filtros ativos, deixando claro para o usuário o que está refinando a lista.
+
+### 3.4. Página de detalhes do filme
+
+`frontend/src/pages/MoviePage.tsx` faz a leitura de `movieId` da rota e carrega os dados de `GET /api/movies/{movieId}`.
+
+Enquanto a requisição acontece, a interface mostra `MovieDetailSkeleton`.
+
+Se o ID for inválido ou o filme não puder ser carregado, a tela cai em um `EmptyState` com botão de voltar.
+
+#### O que a tela exibe
+
+O componente `MovieDetailView` mostra:
+
+- pôster
+- título
+- ano de lançamento
+- nota média da TMDB
+- sinopse
+- elenco
+- módulo de avaliação do usuário
+
+#### Avaliação
+
+O módulo de avaliação trabalha assim:
+
+- se o usuário não estiver autenticado, a tela mostra um CTA para login
+- se o usuário estiver autenticado e ainda não tiver nota, ele escolhe de 1 a 5 estrelas e salva
+- se já existir nota, ele pode editar e salvar de novo
+- se quiser remover, a ação passa por confirmação
+
+O comportamento de salvar é simples:
+
+- se `movie.user_rating` existe, a aplicação chama `updateRating()`
+- se não existe, chama `createRating()`
+
+Depois do salvamento, a UI atualiza o estado local sem precisar refazer o fetch completo.
+
+#### Autenticação no fluxo do filme
+
+Quando o usuário tenta avaliar sem estar logado, a aplicação abre `AuthPromptModal`.
+
+Esse modal:
+
+- bloqueia o scroll do fundo
+- fecha com `Escape` ou clique fora
+- preserva o `nextPath` para devolver o usuário ao mesmo filme depois do login ou cadastro
+
+Se uma requisição protegida responder `401`, a tela faz logout, limpa o estado e volta a mostrar o prompt de autenticação.
+
+#### Remoção da avaliação
+
+A exclusão usa `ConfirmDialog`, que também bloqueia o scroll e exige confirmação explícita.
+
+Isso evita remoções acidentais.
+
+### 3.5. Página de filmes avaliados
+
+`frontend/src/pages/RatedPage.tsx` lista as avaliações do usuário autenticado com `GET /api/ratings`.
+
+Se não houver sessão, a tela mostra um estado convidando o usuário a entrar ou criar conta.
+
+Se houver sessão:
+
+- a página busca as avaliações
+- mostra um resumo com quantidade, média e última entrada
+- renderiza os filmes em cards
+- permite remover cada avaliação
+
+Os cards reutilizam `MovieCard`, mas recebem `ratingDate` e uma ação adicional de remoção.
+
+Quando o usuário apaga uma avaliação, a lista local é filtrada sem refetch imediato.
+
+### 3.6. Componentes reutilizáveis
+
+Alguns componentes ajudam a manter a UI consistente:
+
+- `MovieCard`: card clicável com pôster, título, ano, nota TMDB e nota do usuário
+- `MoviePoster`: renderiza a imagem real, ou um placeholder SVG com monograma quando não há pôster
+- `RatingStars`: mostra estrelas lidas ou interativas
+- `GenreSelect`: lista customizada com comportamento de dropdown
+- `PaginationControls`: prev/next e salto direto para página
+- `SegmentedControl`: alternância entre modos e ordenações
+- `DataSourceBanner`: avisa quando os dados vêm do fallback local
+- `ConfirmDialog` e `AuthPromptModal`: modais acessíveis com portal
+- `Page`, `Panel`, `EmptyState`, `SectionHeader`: blocos de layout reutilizáveis
+
+O `MoviePoster` merece destaque: quando não existe pôster disponível, ele gera um `data:image/svg+xml` com monograma e cores derivadas do título. Isso deixa o fallback visualmente mais elegante do que um simples retângulo vazio.
+
+## 4. Docker e execução
+
+O `docker-compose.yml` sobe três serviços:
 
 - `db`
 - `backend`
 - `frontend`
 
-#### `db`
+### `db`
 
 - usa `postgres:16-alpine`
-- persiste em volume nomeado `pgdata_auth`
+- persiste em volume nomeado
 - expõe healthcheck com `pg_isready`
 
-#### `backend`
+### `backend`
 
-- builda a imagem a partir de `backend/Dockerfile`
-- conecta no PostgreSQL via `DATABASE_URL`
-- recebe `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` e `TMDB_API_KEY`
+- gera a imagem a partir de `backend/Dockerfile`
+- recebe `DATABASE_URL` apontando para o PostgreSQL do Compose
 - expõe a porta `8000`
 
-#### `frontend`
+### `frontend`
 
-- builda a imagem a partir de `frontend/Dockerfile`
-- serve o app final com Nginx
+- gera a imagem a partir de `frontend/Dockerfile`
+- usa Nginx para servir os arquivos estáticos
+- faz proxy de `/api/` para o backend
 - expõe a porta `3000`
 
-### 7.2. Backend Dockerfile
+Esse desenho permite que o navegador fale com a mesma origem em produção, o que simplifica a experiência final e reduz problemas de CORS.
 
-O backend roda em `python:3.10-slim`.
+### Execução em um comando
 
-O fluxo é simples:
-
-1. instala dependências
-2. copia o código
-3. inicia `uvicorn app.main:app`
-
-Isso é apropriado para uma API FastAPI pequena e direta.
-
-### 7.3. Frontend Dockerfile
-
-O frontend usa multi-stage build:
-
-1. imagem Node para instalar dependências e gerar `dist`
-2. imagem Nginx para servir os arquivos estáticos
-
-Isso reduz o tamanho da imagem final e melhora a distribuição.
-
-### 7.4. Reverse proxy no Nginx
-
-O arquivo `frontend/nginx.conf` faz proxy de `/api/` para o backend:
-
-- navegador acessa a mesma origem do frontend
-- chamadas para `/api/...` são encaminhadas internamente ao serviço `backend:8000`
-- o backend fica escondido atrás do Nginx no ambiente final
-
-Esse desenho simplifica CORS e deixa a experiência mais parecida com produção.
-
-### 7.5. Execução em um comando
-
-A aplicação atende ao requisito de subir tudo com um comando:
+A aplicação inteira sobe com:
 
 ```bash
 docker compose up --build
 ```
 
-Depois disso:
+## 5. Testes e validação
 
-- frontend em `http://localhost:3000`
-- backend em `http://localhost:8000`
-- healthcheck em `http://localhost:8000/health`
+A base tem uma suíte pequena, mas bem focada, em `backend/tests/`.
 
-## 8. Qualidade geral da aplicação
+### `test_fallback.py`
 
-### 8.1. Pontos fortes
+- valida que a busca e o detalhe retornam `source: "fixture"` quando a TMDB não está disponível
+- valida que o mesmo fluxo responde `source: "tmdb"` quando o cliente é mockado para sucesso
 
-- Separação clara entre frontend, backend e integração externa
-- Contratos tipados no frontend e schemas validados no backend
-- Autenticação funcional com JWT e hash de senha
-- Persistência real no banco, com avaliação por usuário
-- Cache em memória para reduzir chamadas ao TMDB
-- Fallback local para manter o app útil sem dependência externa
-- Estados de loading e empty state em fluxos importantes
-- Estrutura de UI reutilizável com componentes como `Page`, `Panel`, `EmptyState`, `SectionHeader` e `Button`
-- Busca com debounce e cancelamento de requisições
-- Filtro por ano e gênero
-- Paginação e scroll infinito
+### `test_ratings.py`
 
-### 8.2. Boas decisões de implementação
+- cria um usuário com JWT válido
+- faz `POST /api/ratings` duas vezes para o mesmo `tmdb_id`
+- confirma que apenas uma linha persiste no banco
+- confirma que a nota mais recente é a que fica salva
 
-#### Normalização de dados
+Os testes usam `pytest`, `TestClient` do FastAPI e SQLite temporário isolado por teste.
 
-O backend traduz a resposta do TMDB para um formato próprio. Isso protege o frontend de mudanças pontuais na API externa.
+Na validação atual do repositório, o frontend também compila com `npm run build`.
 
-#### Sessão simples e previsível
+## 6. Limitações e decisões assumidas
 
-A aplicação evita servidor de sessão. O JWT é suficiente para o escopo do MVP e reduz complexidade.
+Algumas escolhas foram intencionais para manter o escopo do MVP enxuto:
 
-#### UX com feedback explícito
-
-O usuário vê:
-
-- loading skeletons
-- mensagens de erro
-- estado vazio
-- indicação de avaliação já salva
-
-#### Componentização
-
-Os componentes de layout e UI tornam a interface consistente e reduzem repetição.
-
-### 8.3. Limitações atuais
-
-Alguns pontos ainda estão fora do escopo atual:
-
-- não há migrations formais com Alembic
+- os detalhes do filme foram entregues como página dedicada, não como modal; o requisito aceita as duas abordagens
 - não há refresh token
 - não há revogação de sessão no servidor
 - não há recuperação de senha
+- não há verificação de e-mail
 - não há login social
-- há testes automatizados pontuais, mas não uma suíte completa cobrindo o fluxo inteiro de autenticação e permissões
+- não há migrações formais com Alembic
+- não há suíte completa de integração end-to-end
+- não há revalidação automática da sessão no boot do frontend
 
-Esses itens não impedem o MVP de funcionar, mas são evoluções naturais para uma versão mais madura.
+Também existe um ponto técnico a evoluir no futuro:
 
-## 9. Conclusão
+- `backend/app/main.py` ainda usa `@app.on_event("startup")`; o FastAPI já sinaliza essa abordagem como deprecada em favor de handlers de lifespan
 
-A aplicação está organizada de forma coerente para um MVP de avaliação de filmes:
+Nenhum desses pontos impede a entrega atual de cumprir o objetivo do teste.
 
-- o frontend concentra a experiência do usuário
-- o backend protege os dados e integra com o TMDB
-- o banco armazena estado persistente por usuário
-- o Docker entrega um ambiente executável e reproduzível
+## 7. Conclusão
 
-O resultado é uma base simples de entender, mas com decisões técnicas suficientes para sustentar autenticação, busca externa, persistência e boa experiência de uso.
+A aplicação ficou organizada com uma separação clara entre apresentação, estado de sessão, persistência e integração externa.
+
+Os principais fluxos pedidos pelo teste estão cobertos:
+
+- busca
+- detalhe
+- avaliação
+- lista de filmes avaliados
+- autenticação
+- paginação / scroll infinito
+- filtros
+- cache
+
+O resultado é uma base enxuta, explicável e funcional para o escopo do teste.

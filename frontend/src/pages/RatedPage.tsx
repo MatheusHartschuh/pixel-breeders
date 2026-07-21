@@ -7,7 +7,9 @@ import { EmptyState } from "../components/layout/EmptyState";
 import { Page } from "../components/layout/Page";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import { Button } from "../components/ui/Button";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { formatEvaluationDate } from "../lib/format";
+import { ptBR } from "../i18n";
 import type { MovieSummary, RatingRecord } from "../types";
 
 export function RatedPage() {
@@ -15,10 +17,12 @@ export function RatedPage() {
   const [ratings, setRatings] = useState<RatingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<RatingRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const nextPath = encodeURIComponent("/rated");
 
   useEffect(() => {
-    document.title = "Pixel Breeders | Filmes avaliados";
+    document.title = ptBR.rated.documentTitle;
   }, []);
 
   useEffect(() => {
@@ -47,7 +51,7 @@ export function RatedPage() {
           return;
         }
 
-        const message = requestError instanceof Error ? requestError.message : "Nao foi possivel carregar as avaliacoes";
+        const message = requestError instanceof Error ? requestError.message : ptBR.common.feedback.genericLoadRatingsError;
         if (isUnauthorizedError(requestError)) {
           logout();
           setRatings([]);
@@ -63,37 +67,57 @@ export function RatedPage() {
     return () => controller.abort();
   }, [user, logout]);
 
-  async function handleDelete(movieId: number) {
+  function handleDeleteRequest(rating: RatingRecord) {
     if (!user) {
       return;
     }
 
-    if (!window.confirm("Remover esta avaliacao?")) {
+    setPendingDelete(rating);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) {
       return;
     }
 
+    setIsDeleting(true);
+
     try {
-      await deleteRating(movieId);
-      setRatings((current) => current.filter((item) => item.tmdb_id !== movieId));
+      await deleteRating(pendingDelete.tmdb_id);
+      setRatings((current) => current.filter((item) => item.tmdb_id !== pendingDelete.tmdb_id));
+      setPendingDelete(null);
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Nao foi possivel remover a avaliacao";
+      const message = requestError instanceof Error ? requestError.message : ptBR.common.feedback.genericDeleteRatingError;
       if (isUnauthorizedError(requestError)) {
         logout();
+        setPendingDelete(null);
         setRatings([]);
         setLoading(false);
         setError("");
         return;
       }
       setError(message);
+    } finally {
+      setIsDeleting(false);
     }
   }
 
   const averageRating = ratings.length > 0 ? ratings.reduce((sum, rating) => sum + rating.rating, 0) / ratings.length : 0;
   const summary = user ? (
-    <div className="collection-summary" aria-label="Resumo da colecao">
-      <span>{ratings.length} filmes</span>
-      <span>{ratings.length > 0 ? `Media ${averageRating.toFixed(1)}/5` : "Sem media ainda"}</span>
-      <span>{ratings[0] ? `Ultima entrada ${formatEvaluationDate(ratings[0].created_at)}` : "Sem registros"}</span>
+    <div className="collection-summary" aria-label={ptBR.rated.summary.ariaLabel}>
+      <span>
+        {ratings.length} {ptBR.rated.summary.filmsSuffix}
+      </span>
+      <span>
+        {ratings.length > 0
+          ? `${ptBR.rated.summary.averagePrefix} ${averageRating.toFixed(1)}/5`
+          : ptBR.rated.summary.noAverage}
+      </span>
+      <span>
+        {ratings[0]
+          ? `${ptBR.rated.summary.lastEntryPrefix} ${formatEvaluationDate(ratings[0].created_at)}`
+          : ptBR.rated.summary.noRecords}
+      </span>
     </div>
   ) : null;
 
@@ -101,17 +125,17 @@ export function RatedPage() {
     if (!user) {
       return (
         <EmptyState
-          title="Entre para ver sua colecao"
-          description="O login libera a lista pessoal de filmes avaliados e mantem suas notas separadas por conta."
+          title={ptBR.rated.states.loggedOutTitle}
+          description={ptBR.rated.states.loggedOutDescription}
           titleAs="h2"
           size="large"
           action={
             <div className="auth-page__links">
               <Button variant="primary" to={`/login?next=${nextPath}`}>
-                Entrar
+                {ptBR.app.rail.signIn}
               </Button>
               <Button variant="secondary" to={`/register?next=${nextPath}`}>
-                Criar conta
+                {ptBR.app.rail.createAccount}
               </Button>
             </div>
           }
@@ -124,17 +148,17 @@ export function RatedPage() {
     }
 
     if (error && ratings.length === 0) {
-      return <EmptyState title="Falha ao carregar" description={error} titleAs="h2" size="large" />;
+      return <EmptyState title={ptBR.rated.states.failureTitle} description={error} titleAs="h2" size="large" />;
     }
 
     if (ratings.length === 0) {
       return (
         <EmptyState
-          title="Sua estante ainda esta vazia"
-          description="Busque um filme na pagina principal, abra os detalhes e salve sua primeira nota."
+          title={ptBR.rated.states.emptyTitle}
+          description={ptBR.rated.states.emptyDescription}
           titleAs="h2"
           size="large"
-          action={<Button variant="primary" to="/">Ir para a busca</Button>}
+          action={<Button variant="primary" to="/">{ptBR.common.buttons.backToSearch}</Button>}
         />
       );
     }
@@ -158,8 +182,8 @@ export function RatedPage() {
               }
               ratingDate={formatEvaluationDate(rating.created_at)}
               actions={
-                <Button variant="text" type="button" onClick={() => handleDelete(rating.tmdb_id)}>
-                  Remover
+                <Button variant="text" className="text-button--danger" type="button" onClick={() => handleDeleteRequest(rating)}>
+                  {ptBR.rated.actions.delete}
                 </Button>
               }
             />
@@ -173,18 +197,28 @@ export function RatedPage() {
     <Page className="rated-page">
       <section className="results-section">
         <SectionHeader
-          eyebrow="Biblioteca pessoal"
-          title="Filmes avaliados"
+          eyebrow={ptBR.rated.section.eyebrow}
+          title={ptBR.rated.section.title}
           titleAs="h1"
           actions={
             <Button variant="text" to="/">
-              Voltar para a busca
+              {ptBR.rated.section.backToSearch}
             </Button>
           }
         />
 
         {summary}
         {pageState}
+        <ConfirmDialog
+          open={pendingDelete !== null}
+          title={ptBR.common.dialogs.removeRatingTitle}
+          description={ptBR.common.dialogs.removeRatingDescription}
+          confirmLabel={ptBR.rated.actions.delete}
+          cancelLabel={ptBR.common.buttons.cancel}
+          loading={isDeleting}
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
       </section>
     </Page>
   );

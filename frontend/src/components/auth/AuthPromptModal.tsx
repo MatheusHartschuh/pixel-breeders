@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
 import { Button } from "../ui/Button";
+import { ptBR } from "../../i18n";
 
 interface AuthPromptModalProps {
   open: boolean;
@@ -46,22 +47,22 @@ export function AuthPromptModal({ open, nextPath, contextLabel, onClose }: AuthP
         aria-describedby="auth-modal-description"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <span className="eyebrow">Autenticação necessária</span>
-        <h2 id="auth-modal-title">Entre para salvar sua avaliação</h2>
+        <span className="eyebrow">{ptBR.auth.modal.eyebrow}</span>
+        <h2 id="auth-modal-title">{ptBR.auth.modal.title}</h2>
         <p id="auth-modal-description">
-          {contextLabel ? `Você continuará exatamente no filme ${contextLabel}.` : "Você continuará exatamente onde estava antes de entrar."}
-          <span> Suas buscas e detalhes seguem livres, mas avaliação e biblioteca pessoal exigem login.</span>
+          {contextLabel ? ptBR.auth.modal.withContext(contextLabel) : ptBR.auth.modal.withoutContext}
+          <span> {ptBR.auth.modal.descriptionTail}</span>
         </p>
 
         <div className="auth-modal__actions">
           <Button variant="primary" to={`/login?next=${nextPath}`}>
-            Entrar
+            {ptBR.auth.modal.signIn}
           </Button>
           <Button variant="secondary" to={`/register?next=${nextPath}`}>
-            Criar conta
+            {ptBR.auth.modal.createAccount}
           </Button>
           <Button variant="text" type="button" onClick={onClose}>
-            Agora não
+            {ptBR.auth.modal.later}
           </Button>
         </div>
       </section>

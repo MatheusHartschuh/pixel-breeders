@@ -2,12 +2,11 @@ import { useEffect, useState } from "react";
 
 import {
   MOVIE_POSTER_CLASS_NAME,
-  PLACEHOLDER_FOOTER,
   PLACEHOLDER_HEIGHT,
-  PLACEHOLDER_TITLE,
   PLACEHOLDER_VIEWBOX,
   PLACEHOLDER_WIDTH,
 } from "./style";
+import { ptBR } from "../../i18n";
 
 function hashString(value: string): number {
   let hash = 0;
@@ -32,14 +31,10 @@ function getMonogram(title: string): string {
     .filter(Boolean);
 
   if (words.length === 0) {
-    return "PB";
+    return "M";
   }
 
-  return words
-    .slice(0, 3)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase();
+  return words[0][0].toUpperCase();
 }
 
 function createPlaceholder(title: string): string {
@@ -64,12 +59,6 @@ function createPlaceholder(title: string): string {
       <rect x="88" y="86" width="424" height="728" rx="20" fill="none" stroke="${accent}" stroke-width="2" />
       <text x="50%" y="47%" text-anchor="middle" dominant-baseline="middle" fill="#f5f3ee" font-size="104" font-family="Georgia, 'Times New Roman', serif" font-weight="700" letter-spacing="4">
         ${monogram}
-      </text>
-      <text x="50%" y="61%" text-anchor="middle" dominant-baseline="middle" fill="rgba(245,243,238,0.82)" font-size="28" font-family="Arial, Helvetica, sans-serif" letter-spacing="5">
-        ${PLACEHOLDER_TITLE}
-      </text>
-      <text x="50%" y="82%" text-anchor="middle" dominant-baseline="middle" fill="${accent}" font-size="24" font-family="Arial, Helvetica, sans-serif" letter-spacing="2">
-        ${PLACEHOLDER_FOOTER}
       </text>
     </svg>
   `;
@@ -96,7 +85,7 @@ export function MoviePoster({ title, posterUrl, className = "" }: MoviePosterPro
     <img
       className={`${MOVIE_POSTER_CLASS_NAME} ${className}`.trim()}
       src={imageSource}
-      alt={`Pôster de ${title}`}
+      alt={ptBR.movie.accessibility.posterAlt(title)}
       loading="lazy"
       onError={() => setHasFailed(true)}
     />

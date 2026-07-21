@@ -1,3 +1,5 @@
+import { ptBR } from "../../i18n";
+
 export const MOVIE_CARD_CLASSNAMES = {
   root: "movie-card",
   link: "movie-card__link",
@@ -13,5 +15,5 @@ export const MOVIE_CARD_CLASSNAMES = {
 } as const;
 
 export const MOVIE_CARD_COPY = {
-  userRatingPrefix: "Minha nota",
+  userRatingPrefix: ptBR.cards.userRatingPrefix,
 } as const;

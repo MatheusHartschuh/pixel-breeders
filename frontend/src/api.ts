@@ -8,6 +8,9 @@ import type {
   SearchResponse,
 } from "./types";
 import { readAuthToken } from "./auth/storage";
+import { ptBR } from "./i18n";
+
+export type SearchSortMode = "relevance" | "recent" | "rating" | "title";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -58,7 +61,7 @@ async function readError(response: Response): Promise<string> {
     const data = (await response.json()) as { detail?: unknown; message?: unknown };
     return extractMessage(data.detail) ?? extractMessage(data.message) ?? response.statusText;
   } catch {
-    return response.statusText || "Ocorreu um erro inesperado";
+    return response.statusText || ptBR.errors.api.unexpected;
   }
 }
 
@@ -92,7 +95,7 @@ export function searchMovies(
   query: string,
   page = 1,
   signal?: AbortSignal,
-  filters?: { year?: number; genreId?: number },
+  filters?: { year?: number; genreId?: number; sort?: SearchSortMode },
 ): Promise<SearchResponse> {
   const params = new URLSearchParams({
     query,
@@ -105,6 +108,10 @@ export function searchMovies(
 
   if (typeof filters?.genreId === "number") {
     params.set("genre_id", String(filters.genreId));
+  }
+
+  if (filters?.sort && filters.sort !== "relevance") {
+    params.set("sort", filters.sort);
   }
 
   return request<SearchResponse>(`/search?${params.toString()}`, { signal });

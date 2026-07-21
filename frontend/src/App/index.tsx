@@ -7,8 +7,10 @@ import { LoginPage } from "../pages/LoginPage";
 import { HomePage } from "../pages/HomePage";
 import { MoviePage } from "../pages/MoviePage";
 import { RatedPage } from "../pages/RatedPage";
+import { SettingsPage } from "../pages/SettingsPage";
 import { RegisterPage } from "../pages/RegisterPage";
 import { APP_BRAND, APP_NAV_ITEMS } from "./style";
+import { ptBR } from "../i18n";
 
 function AppShell() {
   const location = useLocation();
@@ -27,7 +29,7 @@ function AppShell() {
             </span>
           </Link>
 
-          <p className="app-rail__kicker">Descoberta editorial</p>
+          <p className="app-rail__kicker">{ptBR.app.rail.kicker}</p>
 
           <nav className="app-rail__nav">
             {APP_NAV_ITEMS.map(({ to, label, end }) => (
@@ -45,23 +47,23 @@ function AppShell() {
           <div className="app-rail__footer">
             {user ? (
               <div className="app-rail__session">
-                <span className="app-rail__session-label">Sessão</span>
+                <span className="app-rail__session-label">{ptBR.app.rail.session}</span>
                 <strong>{user.username}</strong>
-                <small>{isCheckingSession ? "Validando acesso" : "Acesso ativo"}</small>
+                <small>{isCheckingSession ? ptBR.app.rail.validating : ptBR.app.rail.active}</small>
                 <Button variant="danger" type="button" onClick={logout}>
-                  Sair
+                  {ptBR.app.rail.signOut}
                 </Button>
               </div>
             ) : (
               <div className="app-rail__auth">
-                <span className="app-rail__session-label">Acesso</span>
-                <p>Entre para salvar sua coleção pessoal e manter suas notas sincronizadas.</p>
+                <span className="app-rail__session-label">{ptBR.app.rail.access}</span>
+                <p>{ptBR.app.rail.authDescription}</p>
                 <div className="app-rail__auth-actions">
                   <Button variant="primary" to={`/login?next=${nextPath}`}>
-                    Entrar
+                    {ptBR.app.rail.signIn}
                   </Button>
                   <Button variant="secondary" to={`/register?next=${nextPath}`}>
-                    Criar conta
+                    {ptBR.app.rail.createAccount}
                   </Button>
                 </div>
               </div>
@@ -74,6 +76,7 @@ function AppShell() {
             <Route path="/" element={<HomePage />} />
             <Route path="/movie/:movieId" element={<MoviePage />} />
             <Route path="/rated" element={<RatedPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

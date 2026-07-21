@@ -1,10 +1,6 @@
-export const STAR_LABELS = [
-  "Muito fraco",
-  "Fraco",
-  "Regular",
-  "Bom",
-  "Excelente",
-] as const;
+import { ptBR } from "../../i18n";
+
+export const STAR_LABELS = ptBR.ratingStars.scaleLabels;
 
 export const STAR_COUNT = 5;
 

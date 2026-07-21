@@ -5,6 +5,7 @@ import type { MovieSummary } from "../../types";
 import { formatReleaseYear, formatRating, formatVoteAverage } from "../../lib/format";
 import { MoviePoster } from "../MoviePoster";
 import { MOVIE_CARD_CLASSNAMES, MOVIE_CARD_COPY } from "./style";
+import { ptBR } from "../../i18n";
 
 interface MovieCardProps {
   movie: MovieSummary;
@@ -18,7 +19,7 @@ export function MovieCard({ movie, actions, ratingDate }: MovieCardProps) {
   const cardActions = actions ? <div className={MOVIE_CARD_CLASSNAMES.actions}>{actions}</div> : null;
 
   const movieCardContent = (
-    <Link to={`/movie/${movie.id}`} className={MOVIE_CARD_CLASSNAMES.link} aria-label={`Abrir ${movie.title}`}>
+      <Link to={`/movie/${movie.id}`} className={MOVIE_CARD_CLASSNAMES.link} aria-label={ptBR.cards.openMovieAria(movie.title)}>
       <div className={MOVIE_CARD_CLASSNAMES.poster}>
         <MoviePoster title={movie.title} posterUrl={movie.poster_url} />
       </div>
@@ -38,7 +39,7 @@ export function MovieCard({ movie, actions, ratingDate }: MovieCardProps) {
           ) : null}
         </div>
 
-        {ratingDate ? <p className={MOVIE_CARD_CLASSNAMES.ratingDate}>Avaliada em {ratingDate}</p> : null}
+        {ratingDate ? <p className={MOVIE_CARD_CLASSNAMES.ratingDate}>{ptBR.cards.ratedAtPrefix} {ratingDate}</p> : null}
       </div>
     </Link>
   );

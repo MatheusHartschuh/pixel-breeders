@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+import unicodedata
 from copy import deepcopy
 from dataclasses import asdict
 from dataclasses import dataclass
+from datetime import date
 from math import ceil
 from threading import RLock
 from time import monotonic
@@ -19,6 +21,13 @@ logger = logging.getLogger(__name__)
 
 TMDB_SOURCE: Literal["tmdb"] = "tmdb"
 FIXTURE_SOURCE: Literal["fixture"] = "fixture"
+SearchSortMode = Literal["relevance", "recent", "rating", "title"]
+PAGE_SIZE = 20
+DISCOVER_SORT_BY: dict[SearchSortMode, str] = {
+    "recent": "primary_release_date.desc",
+    "rating": "vote_average.desc",
+    "title": "title.asc",
+}
 
 
 class MovieNotFoundError(Exception):
@@ -88,9 +97,10 @@ class TmdbClient:
         page: int = 1,
         year: int | None = None,
         genre_id: int | None = None,
+        sort: SearchSortMode = "relevance",
     ) -> dict[str, Any]:
         query = query.strip()
-        cache_key = ("search", query, page, year, genre_id, self.use_live_api)
+        cache_key = ("search", query, page, year, genre_id, sort, self.use_live_api)
         cached = self.search_cache.get(cache_key)
         if cached is not None:
             return cached
@@ -101,73 +111,41 @@ class TmdbClient:
                 page=page,
                 year=year,
                 genre_id=genre_id,
+                sort=sort,
                 reason="TMDB_API_KEY ausente",
             )
             self.search_cache.set(cache_key, result)
             return deepcopy(result)
 
-        endpoint = "/search/movie" if query else "/discover/movie"
-        params: dict[str, Any] = {
-            "language": self.language,
-            "page": page,
-            "include_adult": "false",
-            "api_key": self.api_key,
-        }
-        if query:
-            params["query"] = query
-            if year is not None:
-                params["primary_release_year"] = year
-        else:
-            if year is not None:
-                params["primary_release_year"] = year
-            if genre_id is not None:
-                params["with_genres"] = genre_id
-
-        try:
-            with httpx.Client(timeout=self.timeout) as client:
-                response = client.get(f"{self.base_url}{endpoint}", params=params)
-                response.raise_for_status()
-                data = response.json()
-        except httpx.HTTPError as exc:
-            result = self._fixture_search_result(
-                query=query,
-                page=page,
-                year=year,
-                genre_id=genre_id,
-                reason=f"falha na chamada ao TMDB ({exc.__class__.__name__}: {exc})",
-            )
+        if not query:
+            result = self._live_discover_result(page=page, year=year, genre_id=genre_id, sort=sort)
             self.search_cache.set(cache_key, result)
             return deepcopy(result)
 
-        items = [self._normalize_movie(item) for item in data.get("results", [])]
-        if genre_id is not None and query:
-            # O TMDB não oferece gênero + busca textual com paginação coerente no mesmo endpoint.
-            # Mantemos o que foi efetivamente retornado nesta página para não exibir contagens falsas.
-            items = [item for item in items if genre_id in item.get("genre_ids", [])]
-            total_results = len(items)
-            total_pages = max(1, ceil(total_results / 20))
-            result = {
-                "items": items,
-                "page": min(page, total_pages),
-                "total_pages": total_pages,
-                "total_results": total_results,
-                "source": TMDB_SOURCE,
-            }
+        if sort == "relevance" and genre_id is None:
+            result = self._live_search_page(query=query, page=page, year=year)
             self.search_cache.set(cache_key, result)
             return deepcopy(result)
-        if year is not None and query:
-            items = [
-                item
-                for item in items
-                if (item.get("release_date") or item.get("first_air_date") or "").startswith(str(year))
-            ]
-        result = {
-            "items": items,
-            "page": data.get("page", page),
-            "total_pages": data.get("total_pages", 1),
-            "total_results": data.get("total_results", len(items)),
-            "source": TMDB_SOURCE,
-        }
+
+        full_cache_key = ("search-all", query, year, genre_id, sort, self.use_live_api)
+        full_cached = self.search_cache.get(full_cache_key)
+        if full_cached is None:
+            try:
+                full_cached = self._live_search_all(query=query, year=year, genre_id=genre_id, sort=sort)
+            except httpx.HTTPError as exc:
+                result = self._fixture_search_result(
+                    query=query,
+                    page=page,
+                    year=year,
+                    genre_id=genre_id,
+                    sort=sort,
+                    reason=f"falha na chamada ao TMDB ({exc.__class__.__name__}: {exc})",
+                )
+                self.search_cache.set(cache_key, result)
+                return deepcopy(result)
+            self.search_cache.set(full_cache_key, full_cached)
+
+        result = self._page_from_full_result(full_cached, page)
         self.search_cache.set(cache_key, result)
         return deepcopy(result)
 
@@ -219,6 +197,179 @@ class TmdbClient:
             return poster_path
         return f"{self.image_base_url}{poster_path}"
 
+    def _normalize_sort_text(self, value: str | None) -> str:
+        if not value:
+            return ""
+
+        normalized = unicodedata.normalize("NFD", value)
+        return "".join(char for char in normalized if unicodedata.category(char) != "Mn").casefold()
+
+    def _release_sort_value(self, item: dict[str, Any]) -> int:
+        value = item.get("release_date") or item.get("first_air_date")
+        if not value:
+            return 0
+
+        try:
+            return date.fromisoformat(value).toordinal()
+        except ValueError:
+            return 0
+
+    def _release_year_value(self, item: dict[str, Any]) -> int | None:
+        value = item.get("release_date") or item.get("first_air_date")
+        if not value:
+            return None
+
+        try:
+            return date.fromisoformat(value).year
+        except ValueError:
+            return None
+
+    def _rating_sort_value(self, item: dict[str, Any]) -> float:
+        value = item.get("vote_average")
+        if isinstance(value, (int, float)):
+            return float(value)
+        return -1.0
+
+    def _sort_items(self, items: list[dict[str, Any]], sort: SearchSortMode) -> list[dict[str, Any]]:
+        if sort == "relevance":
+            return items
+
+        if sort == "recent":
+            return sorted(
+                items,
+                key=lambda item: (-self._release_sort_value(item), self._normalize_sort_text(item.get("title") or item.get("name"))),
+            )
+
+        if sort == "rating":
+            return sorted(
+                items,
+                key=lambda item: (-self._rating_sort_value(item), self._normalize_sort_text(item.get("title") or item.get("name"))),
+            )
+
+        return sorted(
+            items,
+            key=lambda item: (
+                self._normalize_sort_text(item.get("title") or item.get("name")),
+                -self._release_sort_value(item),
+            ),
+        )
+
+    def _discover_params(self, page: int, year: int | None, genre_id: int | None, sort: SearchSortMode) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "language": self.language,
+            "page": page,
+            "include_adult": "false",
+            "api_key": self.api_key,
+        }
+        if year is not None:
+            params["primary_release_year"] = year
+        if genre_id is not None:
+            params["with_genres"] = genre_id
+        if sort != "relevance":
+            params["sort_by"] = DISCOVER_SORT_BY[sort]
+        return params
+
+    def _search_params(self, query: str, page: int, year: int | None) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "language": self.language,
+            "page": page,
+            "include_adult": "false",
+            "api_key": self.api_key,
+            "query": query,
+        }
+        if year is not None:
+            params["primary_release_year"] = year
+        return params
+
+    def _request_json(self, endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
+        with httpx.Client(timeout=self.timeout) as client:
+            response = client.get(f"{self.base_url}{endpoint}", params=params)
+            response.raise_for_status()
+            return response.json()
+
+    def _normalize_items(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [self._normalize_movie(item) for item in items]
+
+    def _page_from_items(self, items: list[dict[str, Any]], page: int, source: Literal["tmdb", "fixture"]) -> dict[str, Any]:
+        total_results = len(items)
+        total_pages = max(1, ceil(total_results / PAGE_SIZE))
+        current_page = min(max(page, 1), total_pages)
+        start = (current_page - 1) * PAGE_SIZE
+        end = start + PAGE_SIZE
+        return {
+            "items": items[start:end],
+            "page": current_page,
+            "total_pages": total_pages,
+            "total_results": total_results,
+            "source": source,
+        }
+
+    def _page_from_full_result(self, result: dict[str, Any], page: int) -> dict[str, Any]:
+        return self._page_from_items(result["items"], page, result["source"])
+
+    def _live_search_page(self, query: str, page: int, year: int | None) -> dict[str, Any]:
+        data = self._request_json("/search/movie", self._search_params(query, page, year))
+        items = self._normalize_items(data.get("results", []))
+        result = {
+            "items": items,
+            "page": data.get("page", page),
+            "total_pages": data.get("total_pages", 1),
+            "total_results": data.get("total_results", len(items)),
+            "source": TMDB_SOURCE,
+        }
+        return result
+
+    def _live_search_all(
+        self,
+        query: str,
+        year: int | None,
+        genre_id: int | None,
+        sort: SearchSortMode,
+    ) -> dict[str, Any]:
+        first_page = self._request_json("/search/movie", self._search_params(query, 1, year))
+        total_pages = int(first_page.get("total_pages", 1) or 1)
+        items = self._normalize_items(first_page.get("results", []))
+
+        for next_page in range(2, total_pages + 1):
+            next_data = self._request_json("/search/movie", self._search_params(query, next_page, year))
+            items.extend(self._normalize_items(next_data.get("results", [])))
+
+        if year is not None:
+            items = [
+                item
+                for item in items
+                if (item.get("release_date") or item.get("first_air_date") or "").startswith(str(year))
+            ]
+
+        if genre_id is not None:
+            items = [item for item in items if genre_id in item.get("genre_ids", [])]
+
+        items = self._sort_items(items, sort)
+        return {
+            "items": items,
+            "page": 1,
+            "total_pages": max(1, ceil(len(items) / PAGE_SIZE)),
+            "total_results": len(items),
+            "source": TMDB_SOURCE,
+        }
+
+    def _live_discover_result(
+        self,
+        page: int,
+        year: int | None,
+        genre_id: int | None,
+        sort: SearchSortMode,
+    ) -> dict[str, Any]:
+        data = self._request_json("/discover/movie", self._discover_params(page, year, genre_id, sort))
+        items = self._normalize_items(data.get("results", []))
+        return {
+            "items": items,
+            "page": data.get("page", page),
+            "total_pages": data.get("total_pages", 1),
+            "total_results": data.get("total_results", len(items)),
+            "source": TMDB_SOURCE,
+        }
+
     def _normalize_movie(self, item: dict[str, Any]) -> dict[str, Any]:
         return {
             "id": item["id"],
@@ -268,17 +419,25 @@ class TmdbClient:
         page: int,
         year: int | None,
         genre_id: int | None,
+        sort: SearchSortMode,
         reason: str,
     ) -> dict[str, Any]:
         logger.warning(
-            "TMDB fallback para fixtures em search (motivo: %s). query=%r page=%s year=%s genre_id=%s",
+            "TMDB fallback para fixtures em search (motivo: %s). query=%r page=%s year=%s genre_id=%s sort=%s",
             reason,
             query,
             page,
             year,
             genre_id,
+            sort,
         )
-        payload = paginate_fixture_movies(query, page, year=year, genre_id=genre_id)
+        payload = paginate_fixture_movies(
+            query,
+            page,
+            year=year,
+            genre_id=genre_id,
+            sort=sort,
+        )
         return {
             "items": [self._fixture_summary(movie) for movie in payload["items"]],
             "page": payload["page"],

@@ -7,6 +7,9 @@ import { MoviePoster } from "../MoviePoster";
 import { RatingStars } from "../RatingStars";
 import { Page } from "../layout/Page";
 import { Button } from "../ui/Button";
+import { ptBR } from "../../i18n";
+
+const MOVIE = ptBR.movie;
 
 interface MovieDetailViewProps {
   movie: MovieDetail;
@@ -40,73 +43,110 @@ export function MovieDetailView({
   const year = formatReleaseYear(movie.release_date);
   const tmdbRating = formatVoteAverage(movie.vote_average);
 
+  // Meta curta exibida ao lado do pôster.
+  const posterMeta = (
+    <>
+      <span>{year}</span>
+      <span>
+        {MOVIE.labels.tmdb} {tmdbRating}
+      </span>
+    </>
+  );
+
+  // Meta compacta exibida no cabeçalho principal do filme.
+  const movieMeta = (
+    <>
+      <span>{year}</span>
+      <span>
+        {MOVIE.labels.tmdb} {tmdbRating}
+      </span>
+      <span>{hasRating ? MOVIE.labels.alreadyRated : MOVIE.labels.notYetRated}</span>
+    </>
+  );
+
+  // Cabeçalho principal com o título do filme, seus metadados e o resumo da nota.
+  const movieHeader = (
+    <header className="movie-page__header">
+      <span className="eyebrow">{MOVIE.labels.detailTitle}</span>
+      <h1>{movie.title}</h1>
+      <p className="movie-page__meta">{movieMeta}</p>
+
+      <div className="movie-page__rating-summary" aria-label={MOVIE.accessibility.ratingSummary}>
+        <span className="movie-page__rating-label">{MOVIE.labels.myRating}</span>
+        <strong>{hasRating ? formatRating(movie.user_rating) : MOVIE.labels.noRating}</strong>
+        <p>{hasRating ? MOVIE.copies.ratedAlready : MOVIE.copies.ratedAfterSave}</p>
+      </div>
+    </header>
+  );
+
+  // Sinopse com título escondido para manter a semântica sem poluir a tela.
+  const synopsisSection = (
+    <section className="movie-section movie-section--synopsis" aria-labelledby="sinopse-title">
+      <div className="movie-section__header">
+        <span className="section-heading__eyebrow">{MOVIE.labels.synopsisEyebrow}</span>
+        <h2 id="sinopse-title" className="sr-only">
+          {MOVIE.labels.synopsisTitle}
+        </h2>
+      </div>
+      <p>{movie.overview || MOVIE.copies.synopsisUnavailable}</p>
+    </section>
+  );
+
+  // Elenco com título escondido para preservar a estrutura sem a frase visível.
+  const castSection = (
+    <section className="movie-section movie-section--cast" aria-labelledby="elenco-title">
+      <div className="movie-section__header">
+        <span className="section-heading__eyebrow">{MOVIE.labels.castEyebrow}</span>
+        <h2 id="elenco-title" className="sr-only">
+          {MOVIE.labels.castTitle}
+        </h2>
+      </div>
+      {movie.cast.length > 0 ? <CastList cast={movie.cast} /> : <p className="movie-section__empty">{MOVIE.copies.castUnavailable}</p>}
+    </section>
+  );
+
+  // Bloco de avaliação com a CTA de entrar preservada.
+  const ratingModule = (
+    <RatingModule
+      movie={movie}
+      hasRating={hasRating}
+      currentRating={currentRating}
+      selectedRating={selectedRating}
+      onRatingChange={onRatingChange}
+      onSave={onSave}
+      onDelete={onDelete}
+      onRequestLogin={onRequestLogin}
+      saving={saving}
+      statusMessage={statusMessage}
+      error={error}
+      user={user}
+      isCheckingSession={isCheckingSession}
+    />
+  );
+
   return (
     <Page className="movie-page">
       <DataSourceBanner source={movie.source} className="movie-page__source-banner" />
-      <div className="movie-page__crumbs" aria-label="Caminho da pagina">
-        <Link to="/">Busca</Link>
+      <div className="movie-page__crumbs" aria-label={MOVIE.accessibility.pathLabel}>
+        <Link to="/">{MOVIE.crumbs.search}</Link>
         <span aria-hidden="true">/</span>
-        <Link to="/rated">Avaliados</Link>
+        <Link to="/rated">{MOVIE.crumbs.rated}</Link>
       </div>
 
       <section className="movie-page__layout">
         <aside className="movie-page__poster-column">
           <MoviePoster title={movie.title} posterUrl={movie.poster_url} className="movie-poster--detail" />
 
-          <div className="movie-page__poster-meta" aria-label="Resumo rapido">
-            <span>{year}</span>
-            <span>TMDB {tmdbRating}</span>
+          <div className="movie-page__poster-meta" aria-label={MOVIE.accessibility.posterSummary}>
+            {posterMeta}
           </div>
         </aside>
 
         <article className="movie-page__content">
-          <header className="movie-page__header">
-            <span className="eyebrow">Detalhe do filme</span>
-            <h1>{movie.title}</h1>
-            <p className="movie-page__meta">
-              <span>{year}</span>
-              <span>TMDB {tmdbRating}</span>
-              <span>{hasRating ? "Já avaliado" : "Ainda sem avaliação"}</span>
-            </p>
-
-            <div className="movie-page__rating-summary" aria-label="Sua avaliacao">
-              <span className="movie-page__rating-label">Minha nota</span>
-              <strong>{hasRating ? formatRating(movie.user_rating) : "Sem nota"}</strong>
-              <p>{hasRating ? "A avaliação ja faz parte da sua colecao." : "A sua nota aparece aqui depois do salvamento."}</p>
-            </div>
-          </header>
-
-          <section className="movie-section movie-section--synopsis" aria-labelledby="sinopse-title">
-            <div className="movie-section__header">
-              <span className="section-heading__eyebrow">Sinopse</span>
-              <h2 id="sinopse-title">O que o filme conta</h2>
-            </div>
-            <p>{movie.overview || "Sinopse indisponivel."}</p>
-          </section>
-
-          <section className="movie-section movie-section--cast" aria-labelledby="elenco-title">
-            <div className="movie-section__header">
-              <span className="section-heading__eyebrow">Elenco</span>
-              <h2 id="elenco-title">Quem da vida ao filme</h2>
-            </div>
-            {movie.cast.length > 0 ? <CastList cast={movie.cast} /> : <p className="movie-section__empty">Elenco indisponivel.</p>}
-          </section>
-
-          <RatingModule
-            movie={movie}
-            hasRating={hasRating}
-            currentRating={currentRating}
-            selectedRating={selectedRating}
-            onRatingChange={onRatingChange}
-            onSave={onSave}
-            onDelete={onDelete}
-            onRequestLogin={onRequestLogin}
-            saving={saving}
-            statusMessage={statusMessage}
-            error={error}
-            user={user}
-            isCheckingSession={isCheckingSession}
-          />
+          {movieHeader}
+          {synopsisSection}
+          {castSection}
+          {ratingModule}
         </article>
       </section>
     </Page>
@@ -151,7 +191,7 @@ function CastList({ cast }: { cast: CastMember[] }) {
       {cast.map((member) => (
         <li key={`${member.name}-${member.character ?? "cast"}`} className="cast-list__item">
           <strong>{member.name}</strong>
-          <span>{member.character || "Sem personagem informado"}</span>
+          <span>{member.character || ptBR.common.labels.noCharacter}</span>
         </li>
       ))}
     </ul>
@@ -180,8 +220,8 @@ function RatingModule({
     return (
       <section className="movie-page__rating-panel movie-page__rating-panel--loading" aria-labelledby="avaliacao-title">
         <div className="movie-section__header">
-          <span className="section-heading__eyebrow">Avaliação</span>
-          <h2 id="avaliacao-title">Carregando sessao</h2>
+          <span className="section-heading__eyebrow">{MOVIE.labels.ratingEyebrow}</span>
+          <h2 id="avaliacao-title">{MOVIE.labels.loadingRatingTitle}</h2>
         </div>
         <div className="skeleton skeleton--line skeleton--section" />
         <div className="skeleton skeleton--rating" />
@@ -193,16 +233,18 @@ function RatingModule({
     return (
       <section className="movie-page__rating-panel movie-page__rating-panel--prompt" aria-labelledby="avaliacao-title">
         <div className="movie-section__header">
-          <span className="section-heading__eyebrow">Avaliação</span>
-          <h2 id="avaliacao-title">Entre para avaliar</h2>
+          <span className="section-heading__eyebrow">{MOVIE.labels.ratingEyebrow}</span>
+          <h2 id="avaliacao-title" className="sr-only">
+            {MOVIE.labels.enterToRateTitle}
+          </h2>
         </div>
-        <p className="movie-page__rating-copy">O login libera a nota pessoal e salva tudo na sua colecao.</p>
+        <p className="movie-page__rating-copy">{MOVIE.copies.loginToRate}</p>
         <div className="movie-page__rating-preview" aria-hidden="true">
           <RatingStars value={0} size="lg" />
         </div>
         <div className="movie-page__actions">
           <Button variant="primary" type="button" onClick={onRequestLogin}>
-            Entrar para avaliar
+            {MOVIE.buttons.signInToRate}
           </Button>
         </div>
       </section>
@@ -213,22 +255,24 @@ function RatingModule({
     <section className={`movie-page__rating-panel ${hasRating ? "movie-page__rating-panel--rated" : ""}`} aria-labelledby="avaliacao-title">
       <div className="movie-page__rating-top">
         <div>
-          <span className="section-heading__eyebrow">Avaliação</span>
-          <h2 id="avaliacao-title">{hasRating ? "Editar sua nota" : "Salvar sua nota"}</h2>
-          <p className="movie-page__rating-copy">Escolha uma nota de 1 a 5 e mantenha o filme na sua estante pessoal.</p>
+          <span className="section-heading__eyebrow">{MOVIE.labels.ratingEyebrow}</span>
+          <h2 id="avaliacao-title">{hasRating ? MOVIE.labels.editRatingTitle : MOVIE.labels.saveRatingTitle}</h2>
+          <p className="movie-page__rating-copy">{MOVIE.copies.rateInstruction}</p>
         </div>
-        <span className="badge badge--accent">{hasRating ? `Atual ${currentRating}/5` : "Sem nota salva"}</span>
+        <span className="badge badge--accent">
+          {hasRating ? `${MOVIE.labels.currentPrefix} ${currentRating}/5` : MOVIE.labels.unratedBadge}
+        </span>
       </div>
 
       <RatingStars value={selectedRating} onChange={onRatingChange} size="lg" />
 
       <div className="movie-page__actions">
         <Button variant="primary" type="button" disabled={saving || selectedRating < 1} onClick={onSave}>
-          {saving ? "Salvando..." : hasRating ? "Atualizar avaliação" : "Salvar avaliação"}
+          {saving ? ptBR.common.labels.saving : hasRating ? MOVIE.buttons.update : MOVIE.buttons.save}
         </Button>
 
         <Button variant="ghost" type="button" disabled={saving || !hasRating} onClick={onDelete}>
-          Remover avaliação
+          {MOVIE.buttons.remove}
         </Button>
       </div>
 
