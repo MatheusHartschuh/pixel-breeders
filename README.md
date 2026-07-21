@@ -21,11 +21,11 @@ MVP da interface de busca e avaliação de filmes usando TMDB, com backend em Py
 - Estados de loading e tratamento de erro
 - Persistência das avaliações no banco
 - Fallback local com fixtures caso `TMDB_API_KEY` não esteja configurada
+- Paginação e scroll infinito na listagem principal
 
 ## Funcionalidades não implementadas neste MVP
 
 - Autenticação
-- Paginação ou scroll infinito
 - Filtro por gênero ou ano
 - Cache dedicado
 - Modal de detalhes, preferi página dedicada para reduzir complexidade do MVP

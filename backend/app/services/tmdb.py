@@ -7,7 +7,7 @@ import httpx
 
 from app.core.config import settings
 from app.fixtures import get_movie as get_fixture_movie
-from app.fixtures import search_movies as search_fixture_movies
+from app.fixtures import paginate_movies as paginate_fixture_movies
 
 
 class MovieNotFoundError(Exception):
@@ -29,12 +29,12 @@ class TmdbClient:
     def search_movies(self, query: str, page: int = 1) -> dict[str, Any]:
         query = query.strip()
         if not self.use_live_api:
-            movies = search_fixture_movies(query)
+            payload = paginate_fixture_movies(query, page)
             return {
-                "items": [self._fixture_summary(movie) for movie in movies],
-                "page": 1,
-                "total_pages": 1,
-                "total_results": len(movies),
+                "items": [self._fixture_summary(movie) for movie in payload["items"]],
+                "page": payload["page"],
+                "total_pages": payload["total_pages"],
+                "total_results": payload["total_results"],
             }
 
         params = {
@@ -50,12 +50,12 @@ class TmdbClient:
                 response.raise_for_status()
                 data = response.json()
         except httpx.HTTPError:
-            movies = search_fixture_movies(query)
+            payload = paginate_fixture_movies(query, page)
             return {
-                "items": [self._fixture_summary(movie) for movie in movies],
-                "page": 1,
-                "total_pages": 1,
-                "total_results": len(movies),
+                "items": [self._fixture_summary(movie) for movie in payload["items"]],
+                "page": payload["page"],
+                "total_pages": payload["total_pages"],
+                "total_results": payload["total_results"],
             }
 
         items = [self._normalize_movie(item) for item in data.get("results", [])]

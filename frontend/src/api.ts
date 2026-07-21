@@ -29,9 +29,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function searchMovies(query: string): Promise<SearchResponse> {
-  const params = new URLSearchParams({ query });
-  return request<SearchResponse>(`/search?${params.toString()}`);
+export function searchMovies(query: string, page = 1, signal?: AbortSignal): Promise<SearchResponse> {
+  const params = new URLSearchParams({
+    query,
+    page: String(page),
+  });
+
+  return request<SearchResponse>(`/search?${params.toString()}`, { signal });
 }
 
 export function getMovie(movieId: number): Promise<MovieDetail> {

@@ -1,0 +1,6 @@
+export const MOVIE_POSTER_CLASS_NAME = "movie-poster";
+export const PLACEHOLDER_TITLE = "PIXEL BREEDERS";
+export const PLACEHOLDER_FOOTER = "POSTER INDISPONÍVEL";
+export const PLACEHOLDER_VIEWBOX = "0 0 600 900";
+export const PLACEHOLDER_WIDTH = 600;
+export const PLACEHOLDER_HEIGHT = 900;

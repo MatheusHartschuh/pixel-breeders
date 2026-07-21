@@ -373,6 +373,50 @@ button {
   border-radius: var(--radius-lg);
 }
 
+.results-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.segmented-control {
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.segmented-control__button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  color: var(--muted);
+  background: transparent;
+  transition:
+    color 180ms ease,
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.segmented-control__button.is-active {
+  color: #1c1200;
+  background: linear-gradient(135deg, #ffd166, #ffb703);
+}
+
+.results-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
 .section-heading h1,
 .section-heading h2 {
   margin: 10px 0 0;
@@ -611,6 +655,55 @@ button {
 
 .feedback--error {
   color: var(--danger);
+}
+
+.inline-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 16px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.inline-notice--error {
+  border-color: rgba(255, 123, 123, 0.2);
+  background: rgba(255, 123, 123, 0.08);
+  color: #ffd7d7;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 6px;
+  padding: 18px 20px 4px;
+}
+
+.pagination-bar__meta {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.infinite-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 0 4px;
+}
+
+.infinite-footer__sentinel {
+  width: 100%;
+  height: 1px;
+}
+
+.infinite-footer__end {
+  color: var(--muted);
+  margin: 0;
 }
 
 .cast-list {
@@ -879,6 +972,13 @@ button {
     justify-self: start;
   }
 
+  .results-toolbar,
+  .results-summary,
+  .pagination-bar {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .hero__content,
   .hero__panel,
   .panel,
@@ -890,6 +990,14 @@ button {
   .cast-list,
   .stats-row {
     grid-template-columns: 1fr;
+  }
+
+  .segmented-control {
+    width: 100%;
+  }
+
+  .segmented-control__button {
+    flex: 1;
   }
 
   .movie-card__heading {

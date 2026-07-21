@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import unicodedata
+from dataclasses import dataclass
+from math import ceil
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,7 @@ FIXTURE_MOVIES: tuple[FixtureMovie, ...] = (
 )
 
 MOVIES_BY_ID = {movie.id: movie for movie in FIXTURE_MOVIES}
+PAGE_SIZE = 4
 
 
 def _normalize(value: str) -> str:
@@ -148,6 +150,22 @@ def search_movies(query: str) -> list[FixtureMovie]:
 
     scored.sort(key=lambda item: (item[0], item[1].title))
     return [movie for _, movie in scored]
+
+
+def paginate_movies(query: str, page: int) -> dict[str, object]:
+    matched_movies = search_movies(query)
+    total_results = len(matched_movies)
+    total_pages = max(1, ceil(total_results / PAGE_SIZE))
+    current_page = min(max(page, 1), total_pages)
+    start = (current_page - 1) * PAGE_SIZE
+    end = start + PAGE_SIZE
+
+    return {
+        "items": matched_movies[start:end],
+        "page": current_page,
+        "total_pages": total_pages,
+        "total_results": total_results,
+    }
 
 
 def get_movie(movie_id: int) -> FixtureMovie | None:

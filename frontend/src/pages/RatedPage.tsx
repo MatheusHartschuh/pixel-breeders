@@ -62,60 +62,83 @@ export function RatedPage() {
     user_rating: rating.rating,
   }));
 
-  return (
+  // Resume os números principais da biblioteca pessoal.
+  const statsRow = (
+    <div className="stats-row">
+      <div className="stats-card">
+        <span className="stats-card__label">Total</span>
+        <strong>{ratings.length}</strong>
+      </div>
+      <div className="stats-card">
+        <span className="stats-card__label">Última atualização</span>
+        <strong>{ratings[0] ? new Intl.DateTimeFormat("pt-BR").format(new Date(ratings[0].updated_at)) : "Sem dados"}</strong>
+      </div>
+    </div>
+  );
+
+  // Monta o cabeçalho com acesso rápido de volta para a busca.
+  const sectionHeading = (
+    <div className="section-heading">
+      <div>
+        <span className="section-heading__eyebrow">Biblioteca pessoal</span>
+        <h1>Filmes avaliados</h1>
+      </div>
+
+      <Link className="button button--secondary" to="/">
+        Voltar para a busca
+      </Link>
+    </div>
+  );
+
+  // Seleciona o conteúdo principal conforme o estado do carregamento.
+  const pageState = (() => {
+    if (loading) {
+      return <RatedPageSkeleton />;
+    }
+
+    if (error) {
+      return <StateMessage title="Falha ao carregar" description={error} />;
+    }
+
+    if (movies.length === 0) {
+      return (
+        <StateMessage
+          title="Nenhuma avaliação ainda"
+          description="Busque um filme na página principal, abra os detalhes e marque sua nota."
+          action={<Link className="button button--primary" to="/">Ir para a busca</Link>}
+        />
+      );
+    }
+
+    return (
+      <div className="movie-grid">
+        {movies.map((movie) => (
+          <MovieCard
+            key={movie.id}
+            movie={movie}
+            actions={
+              <button className="button button--ghost" type="button" onClick={() => handleDelete(movie.id)}>
+                Remover
+              </button>
+            }
+          />
+        ))}
+      </div>
+    );
+  })();
+
+  // Encapsula a página inteira para manter o return conciso.
+  const pageContent = (
     <div className="page">
       <section className="results-section">
-        <div className="section-heading">
-          <div>
-            <span className="section-heading__eyebrow">Biblioteca pessoal</span>
-            <h1>Filmes avaliados</h1>
-          </div>
-
-          <Link className="button button--secondary" to="/">
-            Voltar para a busca
-          </Link>
-        </div>
-
-        <div className="stats-row">
-          <div className="stats-card">
-            <span className="stats-card__label">Total</span>
-            <strong>{ratings.length}</strong>
-          </div>
-          <div className="stats-card">
-            <span className="stats-card__label">Última atualização</span>
-            <strong>{ratings[0] ? new Intl.DateTimeFormat("pt-BR").format(new Date(ratings[0].updated_at)) : "Sem dados"}</strong>
-          </div>
-        </div>
-
-        {loading ? <RatedPageSkeleton /> : null}
-        {error ? <StateMessage title="Falha ao carregar" description={error} /> : null}
-
-        {!loading && !error && movies.length === 0 ? (
-          <StateMessage
-            title="Nenhuma avaliação ainda"
-            description="Busque um filme na página principal, abra os detalhes e marque sua nota."
-            action={<Link className="button button--primary" to="/">Ir para a busca</Link>}
-          />
-        ) : null}
-
-        {!loading && !error && movies.length > 0 ? (
-          <div className="movie-grid">
-            {movies.map((movie) => (
-              <MovieCard
-                key={movie.id}
-                movie={movie}
-                actions={
-                  <button className="button button--ghost" type="button" onClick={() => handleDelete(movie.id)}>
-                    Remover
-                  </button>
-                }
-              />
-            ))}
-          </div>
-        ) : null}
+        {sectionHeading}
+        {statsRow}
+        {pageState}
       </section>
     </div>
   );
+
+  return pageContent;
 }
 
 function StateMessage({
