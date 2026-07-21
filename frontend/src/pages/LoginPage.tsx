@@ -1,6 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
+import { AuthLoadingState } from "../components/auth/AuthLoadingState";
+import { AuthPageLayout } from "../components/auth/AuthPageLayout";
+import { Button } from "../components/ui/Button";
+import { Field } from "../components/ui/Field";
 import { useAuth } from "../auth/AuthProvider";
 import { getSafeRedirectPath } from "../lib/navigation";
 
@@ -50,83 +54,58 @@ export function LoginPage() {
   }
 
   return (
-    <div className="page">
-      <section className="auth-page">
-        <div className="auth-page__intro">
-          <span className="eyebrow">Acesso</span>
-          <h1>Entre para salvar suas avaliações</h1>
-          <p>
-            O login libera as rotas protegidas do projeto e mantém suas notas vinculadas à sua conta em todos os
-            dispositivos.
-          </p>
-          <div className="auth-page__links">
-            <Link className="button button--secondary" to="/">
-              Voltar para a busca
-            </Link>
-            <Link className="button button--ghost" to={`/register?next=${encodeURIComponent(nextPath)}`}>
-              Criar conta
-            </Link>
-          </div>
+    <AuthPageLayout
+      eyebrow="Acesso"
+      title="Entre para salvar suas avaliações"
+      description="O login libera as rotas protegidas do projeto e mantém suas notas vinculadas à sua conta em todos os dispositivos."
+      introActions={
+        <>
+          <Button variant="secondary" to="/">
+            Voltar para a busca
+          </Button>
+          <Button variant="ghost" to={`/register?next=${encodeURIComponent(nextPath)}`}>
+            Criar conta
+          </Button>
+        </>
+      }
+      cardTitle="Entrar"
+      cardDescription="Use seu nome de usuário e senha para continuar."
+    >
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <Field variant="auth" label="Usuário">
+          <input
+            className="auth-form__input"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            autoComplete="username"
+            placeholder="ex: Nome"
+            required
+          />
+        </Field>
+
+        <Field variant="auth" label="Senha">
+          <input
+            className="auth-form__input"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="current-password"
+            placeholder="Sua senha"
+            required
+          />
+        </Field>
+
+        <div className="auth-form__actions">
+          <Button variant="primary" type="submit" disabled={loading}>
+            {loading ? "Entrando..." : "Entrar"}
+          </Button>
+          <Button variant="secondary" to={`/register?next=${encodeURIComponent(nextPath)}`}>
+            Criar conta
+          </Button>
         </div>
 
-        <section className="panel auth-card">
-          <div className="panel__header">
-            <div>
-              <h2>Entrar</h2>
-              <p>Use seu nome de usuário e senha para continuar.</p>
-            </div>
-          </div>
-
-          <form className="auth-form" onSubmit={handleSubmit}>
-            <label className="auth-form__field">
-              <span>Usuário</span>
-              <input
-                className="auth-form__input"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                autoComplete="username"
-                placeholder="ex: Nome"
-                required
-              />
-            </label>
-
-            <label className="auth-form__field">
-              <span>Senha</span>
-              <input
-                className="auth-form__input"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
-                placeholder="Sua senha"
-                required
-              />
-            </label>
-
-            <div className="auth-form__actions">
-              <button className="button button--primary" type="submit" disabled={loading}>
-                {loading ? "Entrando..." : "Entrar"}
-              </button>
-              <Link className="button button--secondary" to={`/register?next=${encodeURIComponent(nextPath)}`}>
-                Criar conta
-              </Link>
-            </div>
-
-            {error ? <p className="feedback feedback--error">{error}</p> : null}
-          </form>
-        </section>
-      </section>
-    </div>
-  );
-}
-
-function AuthLoadingState({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="page">
-      <section className="empty-state empty-state--large">
-        <h1>{title}</h1>
-        <p>{description}</p>
-      </section>
-    </div>
+        {error ? <p className="feedback feedback--error">{error}</p> : null}
+      </form>
+    </AuthPageLayout>
   );
 }

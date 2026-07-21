@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import asdict
 from dataclasses import dataclass
+from math import ceil
 from threading import RLock
 from time import monotonic
 from typing import Any
@@ -134,7 +135,19 @@ class TmdbClient:
 
         items = [self._normalize_movie(item) for item in data.get("results", [])]
         if genre_id is not None and query:
+            # O TMDB não oferece gênero + busca textual com paginação coerente no mesmo endpoint.
+            # Mantemos o que foi efetivamente retornado nesta página para não exibir contagens falsas.
             items = [item for item in items if genre_id in item.get("genre_ids", [])]
+            total_results = len(items)
+            total_pages = max(1, ceil(total_results / 20))
+            result = {
+                "items": items,
+                "page": min(page, total_pages),
+                "total_pages": total_pages,
+                "total_results": total_results,
+            }
+            self.search_cache.set(cache_key, result)
+            return deepcopy(result)
         if year is not None and query:
             items = [
                 item

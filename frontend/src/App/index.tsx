@@ -2,6 +2,7 @@ import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation } fr
 
 import { useAuth } from "../auth/AuthProvider";
 import { buildAuthNextPath } from "../lib/navigation";
+import { Button } from "../components/ui/Button";
 import { LoginPage } from "../pages/LoginPage";
 import { HomePage } from "../pages/HomePage";
 import { MoviePage } from "../pages/MoviePage";
@@ -21,18 +22,18 @@ function AppShell() {
         <strong>{user.username}</strong>
         <small>{isCheckingSession ? "Validando..." : "Ativa"}</small>
       </div>
-      <button className="button button--secondary" type="button" onClick={logout}>
+      <Button variant="secondary" type="button" onClick={logout}>
         Sair
-      </button>
+      </Button>
     </div>
   ) : (
     <div className="site-header__actions">
-      <Link className="button button--secondary" to={`/login?next=${nextPath}`}>
+      <Button variant="secondary" to={`/login?next=${nextPath}`}>
         Entrar
-      </Link>
-      <Link className="button button--primary" to={`/register?next=${nextPath}`}>
+      </Button>
+      <Button variant="primary" to={`/register?next=${nextPath}`}>
         Criar conta
-      </Link>
+      </Button>
     </div>
   );
 

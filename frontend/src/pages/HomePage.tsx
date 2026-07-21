@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import { searchMovies } from "../api";
+import { EmptyState } from "../components/layout/EmptyState";
+import { Page } from "../components/layout/Page";
+import { SectionHeader } from "../components/layout/SectionHeader";
+import { Button } from "../components/ui/Button";
+import { Field } from "../components/ui/Field";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { MovieCard } from "../components/MovieCard";
 import type { MovieSummary } from "../types";
 
@@ -23,6 +29,7 @@ const GENRE_OPTIONS = [
 
 type SearchStatus = "idle" | "typing" | "loading" | "success" | "empty" | "error";
 type SearchMode = "pagination" | "infinite";
+type SearchModeOption = SearchMode;
 
 const YEAR_MIN = 1900;
 const YEAR_MAX = 2100;
@@ -220,9 +227,9 @@ export function HomePage() {
   }
 
   const featuredQueryChips = FEATURED_QUERIES.map((queryName) => (
-    <button key={queryName} type="button" className="chip" onClick={() => handleSuggestion(queryName)}>
+    <Button key={queryName} variant="chip" type="button" onClick={() => handleSuggestion(queryName)}>
       {queryName}
-    </button>
+    </Button>
   ));
 
   const resultsState = (() => {
@@ -231,32 +238,35 @@ export function HomePage() {
     }
 
     if (status === "error" && items.length === 0) {
-      return <StateMessage title="Falha na busca" description={error} />;
+      return <EmptyState title="Falha na busca" description={error} titleAs="h3" />;
     }
 
     if (status === "typing") {
       return (
-        <StateMessage
+        <EmptyState
           title="Continue digitando"
           description="A busca começa com pelo menos 2 caracteres para evitar chamadas desnecessárias."
+          titleAs="h3"
         />
       );
     }
 
     if (status === "idle") {
       return (
-        <StateMessage
+        <EmptyState
           title="Experimente uma busca"
           description="Use os atalhos, filtre por ano ou gênero, ou procure diretamente por qualquer filme do TMDB."
+          titleAs="h3"
         />
       );
     }
 
     if (status === "empty") {
       return (
-        <StateMessage
+        <EmptyState
           title="Nenhum filme encontrado"
           description="Tente outro título ou ajuste os filtros de ano e gênero."
+          titleAs="h3"
         />
       );
     }
@@ -274,27 +284,27 @@ export function HomePage() {
   const paginationBar =
     mode === "pagination" && status === "success" && items.length > 0 && totalPages > 1 ? (
       <div className="pagination-bar">
-        <button
-          className="button button--secondary"
+        <Button
+          variant="secondary"
           type="button"
           disabled={currentPage <= 1 || isLoadingMore}
           onClick={() => void loadPage(trimmedQuery, currentPage - 1, false)}
         >
           Anterior
-        </button>
+        </Button>
 
         <span className="pagination-bar__meta">
           Página {currentPage} de {totalPages}
         </span>
 
-        <button
-          className="button button--secondary"
+        <Button
+          variant="secondary"
           type="button"
           disabled={currentPage >= totalPages || isLoadingMore}
           onClick={() => void loadPage(trimmedQuery, currentPage + 1, false)}
         >
           Próxima
-        </button>
+        </Button>
       </div>
     ) : null;
 
@@ -302,9 +312,9 @@ export function HomePage() {
     <div className="infinite-footer">
       <div ref={sentinelRef} className="infinite-footer__sentinel" aria-hidden="true" />
       {hasMorePages ? (
-        <button className="button button--secondary" type="button" onClick={handleLoadMore} disabled={isLoadingMore}>
+        <Button variant="secondary" type="button" onClick={handleLoadMore} disabled={isLoadingMore}>
           {isLoadingMore ? "Carregando..." : "Carregar mais"}
-        </button>
+        </Button>
       ) : (
         <p className="infinite-footer__end">Você chegou ao fim dos resultados.</p>
       )}
@@ -335,7 +345,7 @@ export function HomePage() {
   }, [hasMorePages, isLoadingMore, mode, status, currentPage, totalPages, trimmedQuery, selectedGenreId, normalizedYear]);
 
   return (
-    <div className="page">
+    <Page>
       <section className="hero">
         <div className="hero__content">
           <span className="eyebrow">MVP sem login</span>
@@ -361,15 +371,14 @@ export function HomePage() {
                 onChange={(event) => setDraft(event.target.value)}
                 autoComplete="off"
               />
-              <button className="button button--primary" type="submit">
+              <Button variant="primary" type="submit">
                 Buscar
-              </button>
+              </Button>
             </div>
           </form>
 
           <div className="search-filters">
-            <label className="search-filters__field">
-              <span>Ano de lançamento</span>
+            <Field variant="filter" label="Ano de lançamento">
               <input
                 className="search-filters__input"
                 type="text"
@@ -379,10 +388,9 @@ export function HomePage() {
                 value={yearInput}
                 onChange={(event) => handleYearChange(event.target.value)}
               />
-            </label>
+            </Field>
 
-            <label className="search-filters__field">
-              <span>Gênero</span>
+            <Field variant="filter" label="Gênero">
               <select
                 className="search-filters__input"
                 value={genreId}
@@ -395,56 +403,47 @@ export function HomePage() {
                   </option>
                 ))}
               </select>
-            </label>
+            </Field>
           </div>
 
           <div className="search-box__chips">{featuredQueryChips}</div>
 
           <div className="hero__links">
-            <Link className="button button--secondary" to="/rated">
+            <Button variant="secondary" to="/rated">
               Ver filmes avaliados
-            </Link>
-            <button className="button button--ghost" type="button" onClick={handleClearAll}>
+            </Button>
+            <Button variant="ghost" type="button" onClick={handleClearAll}>
               Limpar busca e filtros
-            </button>
+            </Button>
           </div>
         </div>
       </section>
 
       <section className="results-section">
-        <div className="section-heading">
-          <div>
-            <span className="section-heading__eyebrow">Resultados</span>
-            <h2>{hasSearch ? `Encontramos ${resultCount} filmes` : "Digite algo ou aplique filtros"}</h2>
-          </div>
+        <SectionHeader
+          eyebrow="Resultados"
+          title={hasSearch ? `Encontramos ${resultCount} filmes` : "Digite algo ou aplique filtros"}
+          titleAs="h2"
+          actions={
+            <div className="results-toolbar">
+              <SegmentedControl<SearchModeOption>
+                ariaLabel="Modo de navegação dos resultados"
+                value={mode}
+                onChange={setMode}
+                options={[
+                  { value: "pagination", label: "Paginação" },
+                  { value: "infinite", label: "Scroll infinito" },
+                ]}
+              />
 
-          <div className="results-toolbar">
-            <div className="segmented-control" role="tablist" aria-label="Modo de navegação dos resultados">
-              <button
-                type="button"
-                className={`segmented-control__button ${mode === "pagination" ? "is-active" : ""}`}
-                aria-pressed={mode === "pagination"}
-                onClick={() => setMode("pagination")}
-              >
-                Paginação
-              </button>
-              <button
-                type="button"
-                className={`segmented-control__button ${mode === "infinite" ? "is-active" : ""}`}
-                aria-pressed={mode === "infinite"}
-                onClick={() => setMode("infinite")}
-              >
-                Scroll infinito
-              </button>
+              {hasSearch ? (
+                <Button variant="text" type="button" onClick={handleClearAll}>
+                  Limpar tudo
+                </Button>
+              ) : null}
             </div>
-
-            {hasSearch ? (
-              <button type="button" className="text-button" onClick={handleClearAll}>
-                Limpar tudo
-              </button>
-            ) : null}
-          </div>
-        </div>
+          }
+        />
 
         {hasSearch ? (
           <div className="results-summary">
@@ -474,7 +473,7 @@ export function HomePage() {
         {paginationBar}
         {infiniteFooter}
       </section>
-    </div>
+    </Page>
   );
 }
 
@@ -494,15 +493,6 @@ function normalizeYear(value: string): number | undefined {
 function genreLabel(genreId: number): string {
   const found = GENRE_OPTIONS.find((genre) => genre.id === genreId);
   return found?.label ?? String(genreId);
-}
-
-function StateMessage({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="empty-state">
-      <h3>{title}</h3>
-      <p>{description}</p>
-    </div>
-  );
 }
 
 function MovieGridSkeleton() {

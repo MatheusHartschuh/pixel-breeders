@@ -39,6 +39,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let isMounted = true;
     const verificationToken = storedSession.token;
+    const finishIfCurrentSession = () => {
+      const activeSession = readAuthSession();
+      if (isMounted && activeSession?.token === verificationToken) {
+        setIsCheckingSession(false);
+      }
+    };
 
     getMe()
       .then((currentUser) => {
@@ -73,14 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (message.includes("Autenticação obrigatória") || message.includes("Token inválido ou expirado")) {
           clearAuthSession();
           setUser(null);
-        }
-      })
-      .finally(() => {
-        const activeSession = readAuthSession();
-        if (isMounted && activeSession?.token === verificationToken) {
           setIsCheckingSession(false);
         }
-      });
+      })
+      .finally(finishIfCurrentSession);
 
     return () => {
       isMounted = false;

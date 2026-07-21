@@ -1,8 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "../auth/AuthProvider";
 import { deleteRating, listRatings } from "../api";
+import { EmptyState } from "../components/layout/EmptyState";
+import { Page } from "../components/layout/Page";
+import { SectionHeader } from "../components/layout/SectionHeader";
+import { Button } from "../components/ui/Button";
 import { MovieCard } from "../components/MovieCard";
 import type { MovieSummary, RatingRecord } from "../types";
 
@@ -93,7 +96,6 @@ export function RatedPage() {
     user_rating: rating.rating,
   }));
 
-  // Resume os números principais da biblioteca pessoal.
   const statsRow = (
     <div className="stats-row">
       <div className="stats-card">
@@ -107,21 +109,6 @@ export function RatedPage() {
     </div>
   );
 
-  // Monta o cabeçalho com acesso rápido de volta para a busca.
-  const sectionHeading = (
-    <div className="section-heading">
-      <div>
-        <span className="section-heading__eyebrow">Biblioteca pessoal</span>
-        <h1>Filmes avaliados</h1>
-      </div>
-
-      <Link className="button button--secondary" to="/">
-        Voltar para a busca
-      </Link>
-    </div>
-  );
-
-  // Seleciona o conteúdo principal conforme o estado do carregamento.
   const pageState = (() => {
     if (isCheckingSession) {
       return <RatedPageSkeleton />;
@@ -129,17 +116,19 @@ export function RatedPage() {
 
     if (!user) {
       return (
-        <StateMessage
+        <EmptyState
           title="Entre para ver suas avaliações"
           description="O login libera a lista pessoal de filmes avaliados e mantém suas notas separadas de outras contas."
+          titleAs="h2"
+          size="large"
           action={
             <div className="auth-page__links">
-              <Link className="button button--primary" to={`/login?next=${nextPath}`}>
+              <Button variant="primary" to={`/login?next=${nextPath}`}>
                 Entrar
-              </Link>
-              <Link className="button button--secondary" to={`/register?next=${nextPath}`}>
+              </Button>
+              <Button variant="secondary" to={`/register?next=${nextPath}`}>
                 Criar conta
-              </Link>
+              </Button>
             </div>
           }
         />
@@ -151,15 +140,17 @@ export function RatedPage() {
     }
 
     if (error) {
-      return <StateMessage title="Falha ao carregar" description={error} />;
+      return <EmptyState title="Falha ao carregar" description={error} titleAs="h2" size="large" />;
     }
 
     if (movies.length === 0) {
       return (
-        <StateMessage
+        <EmptyState
           title="Nenhuma avaliação ainda"
           description="Busque um filme na página principal, abra os detalhes e marque sua nota."
-          action={<Link className="button button--primary" to="/">Ir para a busca</Link>}
+          titleAs="h2"
+          size="large"
+          action={<Button variant="primary" to="/">Ir para a busca</Button>}
         />
       );
     }
@@ -171,9 +162,9 @@ export function RatedPage() {
             key={movie.id}
             movie={movie}
             actions={
-              <button className="button button--ghost" type="button" onClick={() => handleDelete(movie.id)}>
+              <Button variant="ghost" type="button" onClick={() => handleDelete(movie.id)}>
                 Remover
-              </button>
+              </Button>
             }
           />
         ))}
@@ -181,35 +172,23 @@ export function RatedPage() {
     );
   })();
 
-  // Encapsula a página inteira para manter o return conciso.
-  const pageContent = (
-    <div className="page">
+  return (
+    <Page>
       <section className="results-section">
-        {sectionHeading}
+        <SectionHeader
+          eyebrow="Biblioteca pessoal"
+          title="Filmes avaliados"
+          titleAs="h1"
+          actions={
+            <Button variant="secondary" to="/">
+              Voltar para a busca
+            </Button>
+          }
+        />
         {user ? statsRow : null}
         {pageState}
       </section>
-    </div>
-  );
-
-  return pageContent;
-}
-
-function StateMessage({
-  title,
-  description,
-  action,
-}: {
-  title: string;
-  description: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="empty-state empty-state--large">
-      <h2>{title}</h2>
-      <p>{description}</p>
-      {action ? <div>{action}</div> : null}
-    </div>
+    </Page>
   );
 }
 
