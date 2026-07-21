@@ -6,19 +6,41 @@ import { MovieCard } from "../components/MovieCard";
 import type { MovieSummary } from "../types";
 
 const FEATURED_QUERIES = ["The Matrix", "Interstellar", "Parasite", "Whiplash"];
+const GENRE_OPTIONS = [
+  { id: 28, label: "Ação" },
+  { id: 12, label: "Aventura" },
+  { id: 16, label: "Animação" },
+  { id: 35, label: "Comédia" },
+  { id: 80, label: "Crime" },
+  { id: 18, label: "Drama" },
+  { id: 14, label: "Fantasia" },
+  { id: 27, label: "Terror" },
+  { id: 9648, label: "Mistério" },
+  { id: 10749, label: "Romance" },
+  { id: 878, label: "Ficção científica" },
+  { id: 53, label: "Thriller" },
+] as const;
 
 type SearchStatus = "idle" | "typing" | "loading" | "success" | "empty" | "error";
 type SearchMode = "pagination" | "infinite";
 
+const YEAR_MIN = 1900;
+const YEAR_MAX = 2100;
+
 export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get("q") ?? "";
+  const initialYear = searchParams.get("year") ?? "";
+  const initialGenre = searchParams.get("genre") ?? "";
+  const initialMode = searchParams.get("mode") === "infinite" ? "infinite" : "pagination";
 
   const [draft, setDraft] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
-  const [mode, setMode] = useState<SearchMode>("pagination");
+  const [mode, setMode] = useState<SearchMode>(initialMode);
+  const [yearInput, setYearInput] = useState(initialYear);
+  const [genreId, setGenreId] = useState(initialGenre);
   const [items, setItems] = useState<MovieSummary[]>([]);
-  const [status, setStatus] = useState<SearchStatus>(initialQuery ? "loading" : "idle");
+  const [status, setStatus] = useState<SearchStatus>(initialQuery || initialYear || initialGenre ? "loading" : "idle");
   const [error, setError] = useState("");
   const [resultCount, setResultCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
@@ -39,6 +61,14 @@ export function HomePage() {
     return () => window.clearTimeout(timeout);
   }, [draft]);
 
+  const trimmedQuery = query.trim();
+  const normalizedYear = normalizeYear(yearInput);
+  const selectedGenreId = genreId ? Number(genreId) : undefined;
+  const hasActiveFilters = normalizedYear !== undefined || selectedGenreId !== undefined;
+  const hasSearch = trimmedQuery.length >= 2 || hasActiveFilters;
+  const hasMorePages = hasSearch && totalPages > 0 && currentPage < totalPages;
+  const yearIsPending = yearInput.trim().length > 0 && normalizedYear === undefined;
+
   function resetResults(nextStatus: SearchStatus) {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -52,8 +82,12 @@ export function HomePage() {
   }
 
   async function loadPage(targetQuery: string, page: number, append: boolean) {
-    const trimmedQuery = targetQuery.trim();
-    if (!trimmedQuery || trimmedQuery.length < 2) {
+    const effectiveQuery = targetQuery.trim();
+    const searchAllowed = effectiveQuery.length === 0 || effectiveQuery.length >= 2;
+    if (!searchAllowed) {
+      return;
+    }
+    if (!effectiveQuery && !hasActiveFilters) {
       return;
     }
 
@@ -73,7 +107,10 @@ export function HomePage() {
     setError("");
 
     try {
-      const response = await searchMovies(trimmedQuery, page, controller.signal);
+      const response = await searchMovies(effectiveQuery, page, controller.signal, {
+        year: normalizedYear,
+        genreId: selectedGenreId,
+      });
 
       if (controller.signal.aborted) {
         return;
@@ -82,13 +119,7 @@ export function HomePage() {
       setResultCount(response.total_results);
       setCurrentPage(response.page);
       setTotalPages(response.total_pages);
-      setItems((current) => {
-        if (append) {
-          return [...current, ...response.items];
-        }
-
-        return response.items;
-      });
+      setItems((current) => (append ? [...current, ...response.items] : response.items));
 
       if (append) {
         setStatus(response.items.length > 0 || existingItemCount > 0 ? "success" : "empty");
@@ -101,7 +132,6 @@ export function HomePage() {
       }
 
       const message = requestError instanceof Error ? requestError.message : "Falha ao buscar filmes";
-
       if (append && existingItemCount > 0) {
         setError(message);
         setStatus("success");
@@ -125,24 +155,39 @@ export function HomePage() {
   }
 
   useEffect(() => {
-    const trimmedQuery = query.trim();
+    if (yearIsPending) {
+      return;
+    }
 
-    if (!trimmedQuery) {
+    if (!trimmedQuery && !hasActiveFilters) {
       resetResults("idle");
-      setSearchParams({}, { replace: true });
       return;
     }
 
-    if (trimmedQuery.length < 2) {
+    if (trimmedQuery.length > 0 && trimmedQuery.length < 2) {
       resetResults("typing");
-      setSearchParams({ q: trimmedQuery }, { replace: true });
       return;
     }
-
-    setSearchParams({ q: trimmedQuery }, { replace: true });
 
     void loadPage(trimmedQuery, 1, false);
-  }, [mode, query, setSearchParams]);
+  }, [trimmedQuery, normalizedYear, selectedGenreId, yearIsPending, mode]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (trimmedQuery) {
+      params.set("q", trimmedQuery);
+    }
+    if (yearInput.trim()) {
+      params.set("year", yearInput.trim());
+    }
+    if (genreId) {
+      params.set("genre", genreId);
+    }
+    if (mode === "infinite") {
+      params.set("mode", mode);
+    }
+    setSearchParams(params, { replace: true });
+  }, [trimmedQuery, yearInput, genreId, mode, setSearchParams]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -155,122 +200,31 @@ export function HomePage() {
   }
 
   function handleLoadMore() {
-    const trimmedQuery = query.trim();
-    if (!trimmedQuery || trimmedQuery.length < 2 || status !== "success") {
-      return;
-    }
-
-    if (isLoadingMore || currentPage >= totalPages) {
+    if (!hasSearch || status !== "success" || isLoadingMore || currentPage >= totalPages) {
       return;
     }
 
     void loadPage(trimmedQuery, currentPage + 1, true);
   }
 
-  const hasSearch = query.trim().length >= 2;
-  const hasMorePages = hasSearch && totalPages > 0 && currentPage < totalPages;
+  function handleClearAll() {
+    setDraft("");
+    setQuery("");
+    setYearInput("");
+    setGenreId("");
+  }
 
-  // Monta os atalhos de busca sugeridos para iniciar rapidamente uma pesquisa.
+  function handleYearChange(value: string) {
+    const digitsOnly = value.replace(/\D/g, "").slice(0, 4);
+    setYearInput(digitsOnly);
+  }
+
   const featuredQueryChips = FEATURED_QUERIES.map((queryName) => (
     <button key={queryName} type="button" className="chip" onClick={() => handleSuggestion(queryName)}>
       {queryName}
     </button>
   ));
 
-  // Renderiza o bloco superior com texto de apresentação, busca e atalhos.
-  const heroSection = (
-    <section className="hero">
-      <div className="hero__content">
-        <span className="eyebrow">MVP sem login</span>
-        <h1>Busque, avalie e volte depois para revisar seus filmes favoritos.</h1>
-        <p>
-          Um fluxo simples e direto: pesquisa via TMDB, detalhes do filme, nota de 1 a 5 e uma lista centralizada
-          dos filmes já avaliados.
-        </p>
-      </div>
-
-      <div className="hero__panel">
-        <form className="search-box" onSubmit={handleSubmit}>
-          <label className="search-box__label" htmlFor="movie-search">
-            Procurar filme
-          </label>
-          <div className="search-box__row">
-            <input
-              id="movie-search"
-              className="search-box__input"
-              type="search"
-              placeholder="Ex.: The Matrix, Parasite, Interstellar..."
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              autoComplete="off"
-            />
-            <button className="button button--primary" type="submit">
-              Buscar
-            </button>
-          </div>
-        </form>
-
-        <div className="search-box__chips">{featuredQueryChips}</div>
-
-        <div className="hero__links">
-          <Link className="button button--secondary" to="/rated">
-            Ver filmes avaliados
-          </Link>
-          <span className="hero__hint">Sem login, sem fricção, com persistência no banco.</span>
-        </div>
-      </div>
-    </section>
-  );
-
-  // Agrupa o controle de modo e a ação de limpar a busca em um único bloco.
-  const resultsToolbar = (
-    <div className="results-toolbar">
-      <div className="segmented-control" role="tablist" aria-label="Modo de navegação dos resultados">
-        <button
-          type="button"
-          className={`segmented-control__button ${mode === "pagination" ? "is-active" : ""}`}
-          aria-pressed={mode === "pagination"}
-          onClick={() => setMode("pagination")}
-        >
-          Paginação
-        </button>
-        <button
-          type="button"
-          className={`segmented-control__button ${mode === "infinite" ? "is-active" : ""}`}
-          aria-pressed={mode === "infinite"}
-          onClick={() => setMode("infinite")}
-        >
-          Scroll infinito
-        </button>
-      </div>
-
-      {hasSearch ? (
-        <button
-          type="button"
-          className="text-button"
-          onClick={() => {
-            setDraft("");
-            setQuery("");
-          }}
-        >
-          Limpar busca
-        </button>
-      ) : null}
-    </div>
-  );
-
-  // Exibe o resumo da consulta atual quando existe uma busca ativa.
-  const resultsSummary = hasSearch ? (
-    <div className="results-summary">
-      <span>
-        Página {currentPage || 1}
-        {totalPages > 0 ? ` de ${totalPages}` : ""}
-      </span>
-      <span>{mode === "pagination" ? "Modo paginado" : "Modo scroll infinito"}</span>
-    </div>
-  ) : null;
-
-  // Seleciona o estado da lista de resultados antes de renderizar a grade.
   const resultsState = (() => {
     if (status === "loading" && items.length === 0) {
       return <MovieGridSkeleton />;
@@ -293,7 +247,7 @@ export function HomePage() {
       return (
         <StateMessage
           title="Experimente uma busca"
-          description="Use os atalhos acima ou procure diretamente por qualquer filme do TMDB."
+          description="Use os atalhos, filtre por ano ou gênero, ou procure diretamente por qualquer filme do TMDB."
         />
       );
     }
@@ -302,7 +256,7 @@ export function HomePage() {
       return (
         <StateMessage
           title="Nenhum filme encontrado"
-          description="Tente outro título ou explore uma das sugestões acima."
+          description="Tente outro título ou ajuste os filtros de ano e gênero."
         />
       );
     }
@@ -310,16 +264,6 @@ export function HomePage() {
     return null;
   })();
 
-  // Renderiza a grade principal com os filmes encontrados na busca.
-  const resultsGrid = status === "success" && items.length > 0 ? (
-    <div className="movie-grid">
-      {items.map((movie) => (
-        <MovieCard key={movie.id} movie={movie} />
-      ))}
-    </div>
-  ) : null;
-
-  // Mostra o aviso quando a primeira página carregou, mas a próxima falhou.
   const paginationErrorNotice = status === "success" && error && items.length > 0 ? (
     <div className="inline-notice inline-notice--error">
       <strong>Não foi possível carregar a próxima página.</strong>
@@ -327,7 +271,6 @@ export function HomePage() {
     </div>
   ) : null;
 
-  // Exibe os controles de paginação para o modo tradicional.
   const paginationBar =
     mode === "pagination" && status === "success" && items.length > 0 && totalPages > 1 ? (
       <div className="pagination-bar">
@@ -335,7 +278,7 @@ export function HomePage() {
           className="button button--secondary"
           type="button"
           disabled={currentPage <= 1 || isLoadingMore}
-          onClick={() => void loadPage(query, currentPage - 1, false)}
+          onClick={() => void loadPage(trimmedQuery, currentPage - 1, false)}
         >
           Anterior
         </button>
@@ -348,14 +291,13 @@ export function HomePage() {
           className="button button--secondary"
           type="button"
           disabled={currentPage >= totalPages || isLoadingMore}
-          onClick={() => void loadPage(query, currentPage + 1, false)}
+          onClick={() => void loadPage(trimmedQuery, currentPage + 1, false)}
         >
           Próxima
         </button>
       </div>
     ) : null;
 
-  // Exibe o rodapé do modo infinito com o sentinela e o carregamento adicional.
   const infiniteFooter = mode === "infinite" && status === "success" && items.length > 0 ? (
     <div className="infinite-footer">
       <div ref={sentinelRef} className="infinite-footer__sentinel" aria-hidden="true" />
@@ -385,39 +327,173 @@ export function HomePage() {
           handleLoadMore();
         }
       },
-      {
-        rootMargin: "240px",
-      },
+      { rootMargin: "240px" },
     );
 
     observer.observe(target);
-
     return () => observer.disconnect();
-  }, [currentPage, hasMorePages, isLoadingMore, mode, status]);
+  }, [hasMorePages, isLoadingMore, mode, status, currentPage, totalPages, trimmedQuery, selectedGenreId, normalizedYear]);
 
   return (
     <div className="page">
-      {heroSection}
+      <section className="hero">
+        <div className="hero__content">
+          <span className="eyebrow">MVP sem login</span>
+          <h1>Busque, filtre e revise seus filmes favoritos.</h1>
+          <p>
+            Um fluxo simples e direto: pesquisa via TMDB, detalhes do filme, nota de 1 a 5, página de avaliados e
+            agora também filtros por ano e gênero.
+          </p>
+        </div>
+
+        <div className="hero__panel">
+          <form className="search-box" onSubmit={handleSubmit}>
+            <label className="search-box__label" htmlFor="movie-search">
+              Procurar filme
+            </label>
+            <div className="search-box__row">
+              <input
+                id="movie-search"
+                className="search-box__input"
+                type="search"
+                placeholder="Ex.: The Matrix, Parasite, Interstellar..."
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                autoComplete="off"
+              />
+              <button className="button button--primary" type="submit">
+                Buscar
+              </button>
+            </div>
+          </form>
+
+          <div className="search-filters">
+            <label className="search-filters__field">
+              <span>Ano de lançamento</span>
+              <input
+                className="search-filters__input"
+                type="text"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="2024"
+                value={yearInput}
+                onChange={(event) => handleYearChange(event.target.value)}
+              />
+            </label>
+
+            <label className="search-filters__field">
+              <span>Gênero</span>
+              <select
+                className="search-filters__input"
+                value={genreId}
+                onChange={(event) => setGenreId(event.target.value)}
+              >
+                <option value="">Todos os gêneros</option>
+                {GENRE_OPTIONS.map((genre) => (
+                  <option key={genre.id} value={genre.id}>
+                    {genre.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="search-box__chips">{featuredQueryChips}</div>
+
+          <div className="hero__links">
+            <Link className="button button--secondary" to="/rated">
+              Ver filmes avaliados
+            </Link>
+            <button className="button button--ghost" type="button" onClick={handleClearAll}>
+              Limpar busca e filtros
+            </button>
+          </div>
+        </div>
+      </section>
 
       <section className="results-section">
         <div className="section-heading">
           <div>
             <span className="section-heading__eyebrow">Resultados</span>
-            <h2>{hasSearch ? `Encontramos ${resultCount} filmes` : "Digite algo para começar"}</h2>
+            <h2>{hasSearch ? `Encontramos ${resultCount} filmes` : "Digite algo ou aplique filtros"}</h2>
           </div>
 
-          {resultsToolbar}
+          <div className="results-toolbar">
+            <div className="segmented-control" role="tablist" aria-label="Modo de navegação dos resultados">
+              <button
+                type="button"
+                className={`segmented-control__button ${mode === "pagination" ? "is-active" : ""}`}
+                aria-pressed={mode === "pagination"}
+                onClick={() => setMode("pagination")}
+              >
+                Paginação
+              </button>
+              <button
+                type="button"
+                className={`segmented-control__button ${mode === "infinite" ? "is-active" : ""}`}
+                aria-pressed={mode === "infinite"}
+                onClick={() => setMode("infinite")}
+              >
+                Scroll infinito
+              </button>
+            </div>
+
+            {hasSearch ? (
+              <button type="button" className="text-button" onClick={handleClearAll}>
+                Limpar tudo
+              </button>
+            ) : null}
+          </div>
         </div>
 
-        {resultsSummary}
+        {hasSearch ? (
+          <div className="results-summary">
+            <span>
+              Página {currentPage || 1}
+              {totalPages > 0 ? ` de ${totalPages}` : ""}
+            </span>
+            <span>
+              {mode === "pagination" ? "Modo paginado" : "Modo scroll infinito"}
+              {normalizedYear ? ` · Ano ${normalizedYear}` : ""}
+              {selectedGenreId ? ` · Gênero ${genreLabel(selectedGenreId)}` : ""}
+            </span>
+          </div>
+        ) : null}
+
         {resultsState}
-        {resultsGrid}
+
+        {status === "success" && items.length > 0 ? (
+          <div className="movie-grid">
+            {items.map((movie) => (
+              <MovieCard key={movie.id} movie={movie} />
+            ))}
+          </div>
+        ) : null}
+
         {paginationErrorNotice}
         {paginationBar}
         {infiniteFooter}
       </section>
     </div>
   );
+}
+
+function normalizeYear(value: string): number | undefined {
+  if (value.trim().length !== 4) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  if (Number.isNaN(parsed) || parsed < YEAR_MIN || parsed > YEAR_MAX) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+function genreLabel(genreId: number): string {
+  const found = GENRE_OPTIONS.find((genre) => genre.id === genreId);
+  return found?.label ?? String(genreId);
 }
 
 function StateMessage({ title, description }: { title: string; description: string }) {

@@ -6,6 +6,7 @@ export interface MovieSummary {
   poster_url?: string | null;
   user_rating?: number | null;
   vote_average?: number | null;
+  genre_ids?: number[];
 }
 
 export interface CastMember {

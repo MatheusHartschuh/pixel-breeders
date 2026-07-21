@@ -26,10 +26,16 @@ class TmdbClient:
     def use_live_api(self) -> bool:
         return bool(self.api_key)
 
-    def search_movies(self, query: str, page: int = 1) -> dict[str, Any]:
+    def search_movies(
+        self,
+        query: str,
+        page: int = 1,
+        year: int | None = None,
+        genre_id: int | None = None,
+    ) -> dict[str, Any]:
         query = query.strip()
         if not self.use_live_api:
-            payload = paginate_fixture_movies(query, page)
+            payload = paginate_fixture_movies(query, page, year=year, genre_id=genre_id)
             return {
                 "items": [self._fixture_summary(movie) for movie in payload["items"]],
                 "page": payload["page"],
@@ -37,20 +43,30 @@ class TmdbClient:
                 "total_results": payload["total_results"],
             }
 
-        params = {
-            "query": query,
+        endpoint = "/search/movie" if query else "/discover/movie"
+        params: dict[str, Any] = {
             "language": self.language,
             "page": page,
             "include_adult": "false",
             "api_key": self.api_key,
         }
+        if query:
+            params["query"] = query
+            if year is not None:
+                params["primary_release_year"] = year
+        else:
+            if year is not None:
+                params["primary_release_year"] = year
+            if genre_id is not None:
+                params["with_genres"] = genre_id
+
         try:
             with httpx.Client(timeout=self.timeout) as client:
-                response = client.get(f"{self.base_url}/search/movie", params=params)
+                response = client.get(f"{self.base_url}{endpoint}", params=params)
                 response.raise_for_status()
                 data = response.json()
         except httpx.HTTPError:
-            payload = paginate_fixture_movies(query, page)
+            payload = paginate_fixture_movies(query, page, year=year, genre_id=genre_id)
             return {
                 "items": [self._fixture_summary(movie) for movie in payload["items"]],
                 "page": payload["page"],
@@ -59,6 +75,14 @@ class TmdbClient:
             }
 
         items = [self._normalize_movie(item) for item in data.get("results", [])]
+        if genre_id is not None and query:
+            items = [item for item in items if genre_id in item.get("genre_ids", [])]
+        if year is not None and query:
+            items = [
+                item
+                for item in items
+                if (item.get("release_date") or item.get("first_air_date") or "").startswith(str(year))
+            ]
         return {
             "items": items,
             "page": data.get("page", page),
@@ -108,6 +132,7 @@ class TmdbClient:
             "release_date": item.get("release_date") or item.get("first_air_date"),
             "poster_url": self._image_url(item.get("poster_path")),
             "vote_average": item.get("vote_average"),
+            "genre_ids": item.get("genre_ids", []),
         }
 
     def _normalize_detail(self, item: dict[str, Any]) -> dict[str, Any]:
@@ -138,6 +163,7 @@ class TmdbClient:
             "release_date": movie.release_date,
             "poster_url": None,
             "vote_average": None,
+            "genre_ids": list(movie.genre_ids),
         }
 
     def _fixture_detail(self, movie) -> dict[str, Any]:

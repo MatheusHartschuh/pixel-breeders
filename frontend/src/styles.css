@@ -329,6 +329,44 @@ button {
   gap: 10px;
 }
 
+.search-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 0.6fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.search-filters__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.search-filters__field span {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.search-filters__input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 15, 24, 0.9);
+  color: var(--text);
+  outline: none;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.search-filters__input:focus {
+  border-color: rgba(76, 201, 240, 0.34);
+  box-shadow: 0 0 0 4px rgba(76, 201, 240, 0.08);
+}
+
 .chip {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
@@ -986,6 +1024,10 @@ button {
     padding: 20px;
   }
 
+  .search-filters {
+    grid-template-columns: 1fr;
+  }
+
   .movie-grid,
   .cast-list,
   .stats-row {
@@ -998,6 +1040,10 @@ button {
 
   .segmented-control__button {
     flex: 1;
+  }
+
+  .hero__links .button {
+    width: 100%;
   }
 
   .movie-card__heading {

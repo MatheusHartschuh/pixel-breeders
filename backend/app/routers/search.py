@@ -15,9 +15,11 @@ router = APIRouter(tags=["search"])
 def search_movies(
     query: str = Query(default=""),
     page: int = Query(default=1, ge=1),
+    year: int | None = Query(default=None, ge=1900, le=2100),
+    genre_id: int | None = Query(default=None, ge=1),
     db: Session = Depends(get_db),
 ) -> SearchResponse:
-    response = tmdb_client.search_movies(query=query, page=page)
+    response = tmdb_client.search_movies(query=query, page=page, year=year, genre_id=genre_id)
     ratings = {tmdb_id: rating for tmdb_id, rating in db.execute(select(Rating.tmdb_id, Rating.rating)).all()}
 
     items = [

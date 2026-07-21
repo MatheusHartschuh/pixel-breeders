@@ -17,6 +17,7 @@ class FixtureMovie:
     title: str
     overview: str
     release_date: str
+    genre_ids: tuple[int, ...]
     cast: tuple[FixtureCast, ...]
 
 
@@ -26,6 +27,7 @@ FIXTURE_MOVIES: tuple[FixtureMovie, ...] = (
         title="The Matrix",
         overview="A hacker discovers that reality is a simulation and joins a resistance against the machines controlling humanity.",
         release_date="1999-03-31",
+        genre_ids=(28, 878),
         cast=(
             FixtureCast("Keanu Reeves", "Neo"),
             FixtureCast("Carrie-Anne Moss", "Trinity"),
@@ -38,6 +40,7 @@ FIXTURE_MOVIES: tuple[FixtureMovie, ...] = (
         title="Inception",
         overview="A skilled thief enters dreams to steal secrets, but a final mission forces him to plant an idea instead of taking one.",
         release_date="2010-07-16",
+        genre_ids=(28, 878, 12, 53),
         cast=(
             FixtureCast("Leonardo DiCaprio", "Cobb"),
             FixtureCast("Joseph Gordon-Levitt", "Arthur"),
@@ -50,6 +53,7 @@ FIXTURE_MOVIES: tuple[FixtureMovie, ...] = (
         title="Interstellar",
         overview="A team of explorers travels beyond Earth's limits to find a new home for humanity.",
         release_date="2014-11-07",
+        genre_ids=(12, 18, 878),
         cast=(
             FixtureCast("Matthew McConaughey", "Cooper"),
             FixtureCast("Anne Hathaway", "Brand"),
@@ -62,6 +66,7 @@ FIXTURE_MOVIES: tuple[FixtureMovie, ...] = (
         title="The Dark Knight",
         overview="Batman faces a chaotic criminal mastermind who pushes Gotham to the edge.",
         release_date="2008-07-18",
+        genre_ids=(28, 80, 18, 53),
         cast=(
             FixtureCast("Christian Bale", "Bruce Wayne"),
             FixtureCast("Heath Ledger", "Joker"),
@@ -74,6 +79,7 @@ FIXTURE_MOVIES: tuple[FixtureMovie, ...] = (
         title="Forrest Gump",
         overview="A kind-hearted man witnesses decades of American history while living an unexpectedly extraordinary life.",
         release_date="1994-07-06",
+        genre_ids=(35, 18, 10749),
         cast=(
             FixtureCast("Tom Hanks", "Forrest Gump"),
             FixtureCast("Robin Wright", "Jenny Curran"),
@@ -86,6 +92,7 @@ FIXTURE_MOVIES: tuple[FixtureMovie, ...] = (
         title="Pulp Fiction",
         overview="Separate criminal stories intertwine through sharp dialogue, chance encounters, and dark humor.",
         release_date="1994-10-14",
+        genre_ids=(80, 53),
         cast=(
             FixtureCast("John Travolta", "Vincent Vega"),
             FixtureCast("Samuel L. Jackson", "Jules Winnfield"),
@@ -98,6 +105,7 @@ FIXTURE_MOVIES: tuple[FixtureMovie, ...] = (
         title="Whiplash",
         overview="A driven drummer tries to prove himself under a ruthless mentor who demands perfection.",
         release_date="2014-10-10",
+        genre_ids=(18, 10402),
         cast=(
             FixtureCast("Miles Teller", "Andrew Neiman"),
             FixtureCast("J.K. Simmons", "Terence Fletcher"),
@@ -110,6 +118,7 @@ FIXTURE_MOVIES: tuple[FixtureMovie, ...] = (
         title="Parasite",
         overview="Two families from very different worlds become entangled in a tense relationship built on deception and ambition.",
         release_date="2019-05-30",
+        genre_ids=(35, 18, 53),
         cast=(
             FixtureCast("Song Kang-ho", "Ki-taek"),
             FixtureCast("Lee Sun-kyun", "Dong-ik"),
@@ -152,8 +161,29 @@ def search_movies(query: str) -> list[FixtureMovie]:
     return [movie for _, movie in scored]
 
 
-def paginate_movies(query: str, page: int) -> dict[str, object]:
+def _matches_year(movie: FixtureMovie, year: int | None) -> bool:
+    if year is None:
+        return True
+    return movie.release_date.startswith(str(year))
+
+
+def _matches_genre(movie: FixtureMovie, genre_id: int | None) -> bool:
+    if genre_id is None:
+        return True
+    return genre_id in movie.genre_ids
+
+
+def filter_movies(query: str, year: int | None = None, genre_id: int | None = None) -> list[FixtureMovie]:
     matched_movies = search_movies(query)
+    return [
+        movie
+        for movie in matched_movies
+        if _matches_year(movie, year) and _matches_genre(movie, genre_id)
+    ]
+
+
+def paginate_movies(query: str, page: int, year: int | None = None, genre_id: int | None = None) -> dict[str, object]:
+    matched_movies = filter_movies(query, year=year, genre_id=genre_id)
     total_results = len(matched_movies)
     total_pages = max(1, ceil(total_results / PAGE_SIZE))
     current_page = min(max(page, 1), total_pages)

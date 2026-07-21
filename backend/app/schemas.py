@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,6 +18,7 @@ class MovieSummary(BaseModel):
     poster_url: str | None = None
     user_rating: int | None = None
     vote_average: float | None = None
+    genre_ids: list[int] = Field(default_factory=list)
 
 
 class MovieDetail(MovieSummary):

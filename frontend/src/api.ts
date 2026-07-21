@@ -29,11 +29,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function searchMovies(query: string, page = 1, signal?: AbortSignal): Promise<SearchResponse> {
+export function searchMovies(
+  query: string,
+  page = 1,
+  signal?: AbortSignal,
+  filters?: { year?: number; genreId?: number },
+): Promise<SearchResponse> {
   const params = new URLSearchParams({
     query,
     page: String(page),
   });
+
+  if (typeof filters?.year === "number") {
+    params.set("year", String(filters.year));
+  }
+
+  if (typeof filters?.genreId === "number") {
+    params.set("genre_id", String(filters.genreId));
+  }
 
   return request<SearchResponse>(`/search?${params.toString()}`, { signal });
 }
