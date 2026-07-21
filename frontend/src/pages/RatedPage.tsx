@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useAuth } from "../auth/AuthProvider";
-import { deleteRating, listRatings } from "../api";
+import { deleteRating, isUnauthorizedError, listRatings } from "../api";
 import { MovieCard } from "../components/MovieCard";
 import { EmptyState } from "../components/layout/EmptyState";
 import { Page } from "../components/layout/Page";
@@ -11,7 +11,7 @@ import { formatEvaluationDate } from "../lib/format";
 import type { MovieSummary, RatingRecord } from "../types";
 
 export function RatedPage() {
-  const { user, isCheckingSession, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [ratings, setRatings] = useState<RatingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -22,10 +22,6 @@ export function RatedPage() {
   }, []);
 
   useEffect(() => {
-    if (isCheckingSession) {
-      return;
-    }
-
     if (!user) {
       setRatings([]);
       setLoading(false);
@@ -52,7 +48,7 @@ export function RatedPage() {
         }
 
         const message = requestError instanceof Error ? requestError.message : "Nao foi possivel carregar as avaliacoes";
-        if (message.includes("Autenticação obrigatória") || message.includes("Token inválido ou expirado")) {
+        if (isUnauthorizedError(requestError)) {
           logout();
           setRatings([]);
           setLoading(false);
@@ -65,7 +61,7 @@ export function RatedPage() {
       });
 
     return () => controller.abort();
-  }, [isCheckingSession, user, logout]);
+  }, [user, logout]);
 
   async function handleDelete(movieId: number) {
     if (!user) {
@@ -81,8 +77,12 @@ export function RatedPage() {
       setRatings((current) => current.filter((item) => item.tmdb_id !== movieId));
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Nao foi possivel remover a avaliacao";
-      if (message.includes("Autenticação obrigatória") || message.includes("Token inválido ou expirado")) {
+      if (isUnauthorizedError(requestError)) {
         logout();
+        setRatings([]);
+        setLoading(false);
+        setError("");
+        return;
       }
       setError(message);
     }
@@ -98,10 +98,6 @@ export function RatedPage() {
   ) : null;
 
   const pageState = (() => {
-    if (isCheckingSession) {
-      return <RatedPageSkeleton />;
-    }
-
     if (!user) {
       return (
         <EmptyState

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_core import PydanticCustomError
@@ -23,6 +24,7 @@ class MovieSummary(BaseModel):
 
 class MovieDetail(MovieSummary):
     cast: list[CastMember] = Field(default_factory=list)
+    source: Literal["tmdb", "fixture"] = "tmdb"
 
 
 class SearchResponse(BaseModel):
@@ -30,6 +32,7 @@ class SearchResponse(BaseModel):
     page: int
     total_pages: int
     total_results: int
+    source: Literal["tmdb", "fixture"] = "tmdb"
 
 
 class AuthCredentials(BaseModel):

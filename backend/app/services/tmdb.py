@@ -1,18 +1,24 @@
 from __future__ import annotations
 
+import logging
 from copy import deepcopy
 from dataclasses import asdict
 from dataclasses import dataclass
 from math import ceil
 from threading import RLock
 from time import monotonic
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
 from app.core.config import settings
 from app.fixtures import get_movie as get_fixture_movie
 from app.fixtures import paginate_movies as paginate_fixture_movies
+
+logger = logging.getLogger(__name__)
+
+TMDB_SOURCE: Literal["tmdb"] = "tmdb"
+FIXTURE_SOURCE: Literal["fixture"] = "fixture"
 
 
 class MovieNotFoundError(Exception):
@@ -90,13 +96,13 @@ class TmdbClient:
             return cached
 
         if not self.use_live_api:
-            payload = paginate_fixture_movies(query, page, year=year, genre_id=genre_id)
-            result = {
-                "items": [self._fixture_summary(movie) for movie in payload["items"]],
-                "page": payload["page"],
-                "total_pages": payload["total_pages"],
-                "total_results": payload["total_results"],
-            }
+            result = self._fixture_search_result(
+                query=query,
+                page=page,
+                year=year,
+                genre_id=genre_id,
+                reason="TMDB_API_KEY ausente",
+            )
             self.search_cache.set(cache_key, result)
             return deepcopy(result)
 
@@ -122,14 +128,14 @@ class TmdbClient:
                 response = client.get(f"{self.base_url}{endpoint}", params=params)
                 response.raise_for_status()
                 data = response.json()
-        except httpx.HTTPError:
-            payload = paginate_fixture_movies(query, page, year=year, genre_id=genre_id)
-            result = {
-                "items": [self._fixture_summary(movie) for movie in payload["items"]],
-                "page": payload["page"],
-                "total_pages": payload["total_pages"],
-                "total_results": payload["total_results"],
-            }
+        except httpx.HTTPError as exc:
+            result = self._fixture_search_result(
+                query=query,
+                page=page,
+                year=year,
+                genre_id=genre_id,
+                reason=f"falha na chamada ao TMDB ({exc.__class__.__name__}: {exc})",
+            )
             self.search_cache.set(cache_key, result)
             return deepcopy(result)
 
@@ -145,6 +151,7 @@ class TmdbClient:
                 "page": min(page, total_pages),
                 "total_pages": total_pages,
                 "total_results": total_results,
+                "source": TMDB_SOURCE,
             }
             self.search_cache.set(cache_key, result)
             return deepcopy(result)
@@ -159,6 +166,7 @@ class TmdbClient:
             "page": data.get("page", page),
             "total_pages": data.get("total_pages", 1),
             "total_results": data.get("total_results", len(items)),
+            "source": TMDB_SOURCE,
         }
         self.search_cache.set(cache_key, result)
         return deepcopy(result)
@@ -173,7 +181,7 @@ class TmdbClient:
             movie = get_fixture_movie(movie_id)
             if movie is None:
                 raise MovieNotFoundError(f"Filme {movie_id} não encontrado nos dados locais.")
-            result = self._fixture_detail(movie)
+            result = self._fixture_detail(movie, reason="TMDB_API_KEY ausente")
             self.detail_cache.set(cache_key, result)
             return deepcopy(result)
 
@@ -189,11 +197,14 @@ class TmdbClient:
                     raise MovieNotFoundError(f"Filme {movie_id} não encontrado.")
                 response.raise_for_status()
                 data = response.json()
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
             movie = get_fixture_movie(movie_id)
             if movie is None:
                 raise MovieNotFoundError(f"Filme {movie_id} não encontrado nos dados locais.")
-            result = self._fixture_detail(movie)
+            result = self._fixture_detail(
+                movie,
+                reason=f"falha na chamada ao TMDB ({exc.__class__.__name__}: {exc})",
+            )
             self.detail_cache.set(cache_key, result)
             return deepcopy(result)
 
@@ -237,6 +248,7 @@ class TmdbClient:
                 }
                 for member in cast
             ],
+            "source": TMDB_SOURCE,
         }
 
     def _fixture_summary(self, movie) -> dict[str, Any]:
@@ -250,7 +262,33 @@ class TmdbClient:
             "genre_ids": list(movie.genre_ids),
         }
 
-    def _fixture_detail(self, movie) -> dict[str, Any]:
+    def _fixture_search_result(
+        self,
+        query: str,
+        page: int,
+        year: int | None,
+        genre_id: int | None,
+        reason: str,
+    ) -> dict[str, Any]:
+        logger.warning(
+            "TMDB fallback para fixtures em search (motivo: %s). query=%r page=%s year=%s genre_id=%s",
+            reason,
+            query,
+            page,
+            year,
+            genre_id,
+        )
+        payload = paginate_fixture_movies(query, page, year=year, genre_id=genre_id)
+        return {
+            "items": [self._fixture_summary(movie) for movie in payload["items"]],
+            "page": payload["page"],
+            "total_pages": payload["total_pages"],
+            "total_results": payload["total_results"],
+            "source": FIXTURE_SOURCE,
+        }
+
+    def _fixture_detail(self, movie, reason: str) -> dict[str, Any]:
+        logger.warning("TMDB fallback para fixtures em movie detail (motivo: %s). movie_id=%s", reason, movie.id)
         return {
             "id": movie.id,
             "title": movie.title,
@@ -259,6 +297,7 @@ class TmdbClient:
             "poster_url": None,
             "vote_average": None,
             "cast": [asdict(member) for member in movie.cast],
+            "source": FIXTURE_SOURCE,
         }
 
 

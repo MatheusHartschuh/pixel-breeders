@@ -40,4 +40,5 @@ def search_movies(
         page=response["page"],
         total_pages=response["total_pages"],
         total_results=response["total_results"],
+        source=response["source"],
     )

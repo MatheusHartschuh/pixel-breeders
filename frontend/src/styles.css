@@ -793,6 +793,12 @@ h3 {
   border-color: rgba(200, 169, 106, 0.16);
 }
 
+.movie-page__rating-preview {
+  display: flex;
+  justify-content: flex-start;
+  padding: 8px 0 2px;
+}
+
 .movie-page__rating-top {
   display: flex;
   justify-content: space-between;
@@ -836,6 +842,45 @@ h3 {
 }
 
 .auth-page__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.auth-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background:
+    radial-gradient(circle at top, rgba(200, 169, 106, 0.08), transparent 34%),
+    rgba(10, 11, 13, 0.66);
+  backdrop-filter: blur(14px);
+}
+
+.auth-modal__panel {
+  width: min(100%, 520px);
+  display: grid;
+  gap: 14px;
+  padding: 26px;
+  border: 1px solid rgba(200, 169, 106, 0.2);
+  border-radius: 30px;
+  background: linear-gradient(180deg, rgba(27, 30, 34, 0.98), rgba(18, 20, 23, 0.99));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.auth-modal__panel h2 {
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+}
+
+.auth-modal__panel p {
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.auth-modal__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -1232,6 +1277,45 @@ select.search-filters__input {
   color: #f1d6d6;
 }
 
+.data-source-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 13px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(200, 169, 106, 0.22);
+  background:
+    linear-gradient(135deg, rgba(200, 169, 106, 0.12), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.03);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.data-source-banner strong {
+  color: var(--accent);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.data-source-banner p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.data-source-banner code {
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(200, 169, 106, 0.2);
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text);
+}
+
+.movie-page__source-banner {
+  margin-bottom: -4px;
+}
+
 .pagination-bar {
   display: flex;
   align-items: center;
@@ -1444,6 +1528,19 @@ select.search-filters__input {
   .search-console {
     padding-left: 18px;
     padding-right: 18px;
+  }
+
+  .data-source-banner {
+    padding: 12px 14px;
+  }
+
+  .auth-modal {
+    padding: 12px;
+  }
+
+  .auth-modal__panel {
+    padding: 20px;
+    border-radius: 24px;
   }
 
   .button,

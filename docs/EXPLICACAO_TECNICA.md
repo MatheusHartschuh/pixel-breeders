@@ -201,15 +201,16 @@ As rotas de autenticação funcionam assim:
 
 O frontend salva a sessão em `localStorage` por meio de `frontend/src/auth/storage.ts`.
 
-Depois do login:
+Na prática, o fluxo hoje é:
 
 1. o token é salvo localmente
-2. o usuário é colocado no estado global do `AuthProvider`
+2. o `AuthProvider` lê o conteúdo salvo e restaura o usuário imediatamente quando a aplicação sobe
 3. as requisições seguintes passam a enviar `Authorization: Bearer <token>`
 
-Quando a página carrega, o `AuthProvider` valida a sessão chamando `/api/auth/me`.
+O frontend não faz uma revalidação automática da sessão com `/api/auth/me` no boot.
+Em vez disso, ele assume o que está salvo localmente e depende das rotas protegidas para acusar token inválido ou expirado.
 
-Se o token estiver vencido ou inválido, a sessão é limpa e o usuário é deslogado automaticamente.
+Se uma rota protegida responder `401`, páginas como `MoviePage` e `RatedPage` chamam `logout()`, limpam o `localStorage` e retornam o usuário ao estado deslogado.
 
 ## 4. Banco de dados
 
@@ -293,6 +294,12 @@ As avaliações são o núcleo do estado do usuário.
 - cria uma nova avaliação
 - ou atualiza a avaliação existente para o mesmo `tmdb_id`
 
+Esse endpoint funciona como um upsert manual: o backend procura uma avaliação existente para `(user_id, tmdb_id)` e, se encontrar, atualiza `title`, `poster_url`, `overview`, `release_date` e `rating` no mesmo registro.
+
+A regra de unicidade também existe no banco, via `UniqueConstraint("user_id", "tmdb_id")`, então mesmo que o fluxo da API seja alterado no futuro, a integridade continua protegida.
+
+Isso evita duplicidade silenciosa e mantém a lista do usuário consistente.
+
 Essa decisão evita duplicidade e simplifica a UX, porque o usuário pode salvar a nota sem precisar pensar se o filme já foi avaliado.
 
 ### `PATCH /api/ratings/{tmdb_id}`
@@ -351,9 +358,26 @@ Esse cuidado aparece principalmente na página principal, onde o usuário pode d
 
 Se a TMDB falhar, o backend volta para os fixtures locais.
 
-Se uma avaliação protegida receber token inválido, o frontend faz logout automático.
+Se uma avaliação protegida receber token inválido, a página que fez a chamada detecta o `401`, faz logout automático e limpa o estado local.
 
 Ou seja, o sistema tenta degradar de forma controlada em vez de quebrar de maneira abrupta.
+
+### 6.5. Cobertura automatizada
+
+A base hoje tem uma suíte pequena, mas bem direcionada, em `backend/tests/`:
+
+- `test_fallback.py`
+  - valida que `GET /api/search` e `GET /api/movies/{id}` retornam `source: "fixture"` quando o TMDB não está disponível
+  - valida que as mesmas rotas retornam `source: "tmdb"` quando o cliente é mockado para responder com sucesso
+  - usa monkeypatch no singleton `tmdb_client`, sem chamada de rede real
+
+- `test_ratings.py`
+  - cria um usuário autenticado com JWT válido
+  - faz `POST /api/ratings` duas vezes para o mesmo `tmdb_id`
+  - confirma que apenas uma linha persiste no banco
+  - confirma que a avaliação retornada por `GET /api/ratings` contém a nota mais recente
+
+Os testes usam `pytest`, `TestClient` do FastAPI e um banco SQLite isolado por teste, justamente para não depender do banco local ou do PostgreSQL do Docker.
 
 ## 7. Docker
 
@@ -477,7 +501,7 @@ Alguns pontos ainda estão fora do escopo atual:
 - não há revogação de sessão no servidor
 - não há recuperação de senha
 - não há login social
-- não há suíte automatizada de testes cobrindo o fluxo inteiro
+- há testes automatizados pontuais, mas não uma suíte completa cobrindo o fluxo inteiro de autenticação e permissões
 
 Esses itens não impedem o MVP de funcionar, mas são evoluções naturais para uma versão mais madura.
 

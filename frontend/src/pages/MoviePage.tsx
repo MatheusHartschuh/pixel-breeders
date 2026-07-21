@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthProvider";
-import { createRating, deleteRating, getMovie, updateRating } from "../api";
+import { AuthPromptModal } from "../components/auth/AuthPromptModal";
+import { createRating, deleteRating, getMovie, isUnauthorizedError, updateRating } from "../api";
 import { EmptyState } from "../components/layout/EmptyState";
 import { Page } from "../components/layout/Page";
 import { MovieDetailSkeleton, MovieDetailView } from "../components/movie/MovieDetailView";
@@ -22,6 +23,7 @@ export function MoviePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
 
   useEffect(() => {
     document.title = movie ? `${movie.title} | Pixel Breeders` : "Pixel Breeders | Filme";
@@ -29,6 +31,8 @@ export function MoviePage() {
 
   useEffect(() => {
     if (Number.isNaN(movieId)) {
+      setMovie(null);
+      setSelectedRating(0);
       setError("ID do filme inválido.");
       setLoading(false);
       return;
@@ -36,6 +40,8 @@ export function MoviePage() {
 
     const controller = new AbortController();
     setLoading(true);
+    setMovie(null);
+    setSelectedRating(0);
     setError("");
     setStatusMessage("");
 
@@ -62,7 +68,12 @@ export function MoviePage() {
   }, [movieId]);
 
   async function handleSave() {
-    if (!movie || selectedRating < 1 || !user) {
+    if (!movie || selectedRating < 1) {
+      return;
+    }
+
+    if (!user) {
+      setIsAuthPromptOpen(true);
       return;
     }
 
@@ -86,17 +97,28 @@ export function MoviePage() {
       setStatusMessage("Avaliação salva com sucesso.");
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Não foi possível salvar a avaliação";
-      if (message.includes("Autenticação obrigatória") || message.includes("Token inválido ou expirado")) {
+      if (isUnauthorizedError(requestError)) {
         logout();
+        setIsAuthPromptOpen(true);
+        setMovie((current) => (current ? { ...current, user_rating: null } : current));
+        setStatusMessage("");
+        setSelectedRating(0);
+        setError("");
+      } else {
+        setError(message);
       }
-      setError(message);
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete() {
-    if (!movie?.user_rating || !user) {
+    if (!movie?.user_rating) {
+      return;
+    }
+
+    if (!user) {
+      setIsAuthPromptOpen(true);
       return;
     }
 
@@ -111,10 +133,15 @@ export function MoviePage() {
       setStatusMessage("Avaliação removida.");
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Não foi possível remover a avaliação";
-      if (message.includes("Autenticação obrigatória") || message.includes("Token inválido ou expirado")) {
+      if (isUnauthorizedError(requestError)) {
         logout();
+        setIsAuthPromptOpen(true);
+        setMovie((current) => (current ? { ...current, user_rating: null } : current));
+        setSelectedRating(0);
+        setError("");
+      } else {
+        setError(message);
       }
-      setError(message);
     } finally {
       setSaving(false);
     }
@@ -161,18 +188,26 @@ export function MoviePage() {
   }
 
   return (
-    <MovieDetailView
-      movie={movie}
-      selectedRating={selectedRating}
-      onRatingChange={setSelectedRating}
-      onSave={handleSave}
-      onDelete={handleDelete}
-      saving={saving}
-      statusMessage={statusMessage}
-      error={error}
-      user={user}
-      isCheckingSession={isCheckingSession}
-      nextPath={nextPath}
-    />
+    <>
+      <MovieDetailView
+        movie={movie}
+        selectedRating={selectedRating}
+        onRatingChange={setSelectedRating}
+        onSave={handleSave}
+        onDelete={handleDelete}
+        onRequestLogin={() => setIsAuthPromptOpen(true)}
+        saving={saving}
+        statusMessage={statusMessage}
+        error={error}
+        user={user}
+        isCheckingSession={isCheckingSession}
+      />
+      <AuthPromptModal
+        open={isAuthPromptOpen}
+        nextPath={nextPath}
+        contextLabel={movie ? movie.title : undefined}
+        onClose={() => setIsAuthPromptOpen(false)}
+      />
+    </>
   );
 }

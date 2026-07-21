@@ -9,6 +9,8 @@ export interface MovieSummary {
   genre_ids?: number[];
 }
 
+export type DataSource = "tmdb" | "fixture";
+
 export interface CastMember {
   name: string;
   character?: string | null;
@@ -17,6 +19,7 @@ export interface CastMember {
 
 export interface MovieDetail extends MovieSummary {
   cast: CastMember[];
+  source: DataSource;
 }
 
 export interface SearchResponse {
@@ -24,6 +27,7 @@ export interface SearchResponse {
   page: number;
   total_pages: number;
   total_results: number;
+  source: DataSource;
 }
 
 export interface AuthCredentials {

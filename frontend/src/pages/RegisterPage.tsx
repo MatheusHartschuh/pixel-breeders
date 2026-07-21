@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
-import { AuthLoadingState } from "../components/auth/AuthLoadingState";
 import { AuthPageLayout } from "../components/auth/AuthPageLayout";
 import { Button } from "../components/ui/Button";
 import { Field } from "../components/ui/Field";
@@ -15,7 +14,7 @@ function getNextPath(search: string): string {
 export function RegisterPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { register, user, isCheckingSession } = useAuth();
+  const { register, user } = useAuth();
   const nextPath = getNextPath(location.search);
 
   const [username, setUsername] = useState("");
@@ -27,7 +26,7 @@ export function RegisterPage() {
     document.title = "Pixel Breeders | Criar conta";
   }, []);
 
-  if (user && !isCheckingSession) {
+  if (user) {
     return <Navigate to={nextPath} replace />;
   }
 
@@ -47,10 +46,6 @@ export function RegisterPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  if (isCheckingSession && user) {
-    return <AuthLoadingState title="Verificando sessão" description="Estamos validando seu acesso atual." />;
   }
 
   return (

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import { formatReleaseYear, formatRating, formatVoteAverage } from "../../lib/format";
 import type { AuthUser, CastMember, MovieDetail } from "../../types";
+import { DataSourceBanner } from "../layout/DataSourceBanner";
 import { MoviePoster } from "../MoviePoster";
 import { RatingStars } from "../RatingStars";
 import { Page } from "../layout/Page";
@@ -13,12 +14,12 @@ interface MovieDetailViewProps {
   onRatingChange: (value: number) => void;
   onSave: () => void;
   onDelete: () => void;
+  onRequestLogin: () => void;
   saving: boolean;
   statusMessage: string;
   error: string;
   user: AuthUser | null;
   isCheckingSession: boolean;
-  nextPath: string;
 }
 
 export function MovieDetailView({
@@ -27,12 +28,12 @@ export function MovieDetailView({
   onRatingChange,
   onSave,
   onDelete,
+  onRequestLogin,
   saving,
   statusMessage,
   error,
   user,
   isCheckingSession,
-  nextPath,
 }: MovieDetailViewProps) {
   const hasRating = typeof movie.user_rating === "number";
   const currentRating = movie.user_rating ?? 0;
@@ -41,6 +42,7 @@ export function MovieDetailView({
 
   return (
     <Page className="movie-page">
+      <DataSourceBanner source={movie.source} className="movie-page__source-banner" />
       <div className="movie-page__crumbs" aria-label="Caminho da pagina">
         <Link to="/">Busca</Link>
         <span aria-hidden="true">/</span>
@@ -98,12 +100,12 @@ export function MovieDetailView({
             onRatingChange={onRatingChange}
             onSave={onSave}
             onDelete={onDelete}
+            onRequestLogin={onRequestLogin}
             saving={saving}
             statusMessage={statusMessage}
             error={error}
             user={user}
             isCheckingSession={isCheckingSession}
-            nextPath={nextPath}
           />
         </article>
       </section>
@@ -164,12 +166,12 @@ function RatingModule({
   onRatingChange,
   onSave,
   onDelete,
+  onRequestLogin,
   saving,
   statusMessage,
   error,
   user,
   isCheckingSession,
-  nextPath,
 }: MovieDetailViewProps & {
   hasRating: boolean;
   currentRating: number;
@@ -195,12 +197,12 @@ function RatingModule({
           <h2 id="avaliacao-title">Entre para avaliar</h2>
         </div>
         <p className="movie-page__rating-copy">O login libera a nota pessoal e salva tudo na sua colecao.</p>
+        <div className="movie-page__rating-preview" aria-hidden="true">
+          <RatingStars value={0} size="lg" />
+        </div>
         <div className="movie-page__actions">
-          <Button variant="primary" to={`/login?next=${nextPath}`}>
-            Entrar
-          </Button>
-          <Button variant="secondary" to={`/register?next=${nextPath}`}>
-            Criar conta
+          <Button variant="primary" type="button" onClick={onRequestLogin}>
+            Entrar para avaliar
           </Button>
         </div>
       </section>

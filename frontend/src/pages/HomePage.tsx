@@ -4,13 +4,14 @@ import { useSearchParams } from "react-router-dom";
 import { searchMovies } from "../api";
 import { MovieCard } from "../components/MovieCard";
 import { EmptyState } from "../components/layout/EmptyState";
+import { DataSourceBanner } from "../components/layout/DataSourceBanner";
 import { Page } from "../components/layout/Page";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import { Button } from "../components/ui/Button";
 import { Field } from "../components/ui/Field";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { formatReleaseYear } from "../lib/format";
-import type { MovieSummary } from "../types";
+import type { DataSource, MovieSummary } from "../types";
 
 const GENRE_OPTIONS = [
   { id: 28, label: "Acao" },
@@ -64,6 +65,7 @@ export function HomePage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [dataSource, setDataSource] = useState<DataSource | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -100,6 +102,7 @@ export function HomePage() {
     setCurrentPage(0);
     setTotalPages(0);
     setIsLoadingMore(false);
+    setDataSource(null);
     setStatus(nextStatus);
   }
 
@@ -121,6 +124,7 @@ export function HomePage() {
     } else {
       setItems([]);
       setStatus("loading");
+      setDataSource(null);
     }
 
     setError("");
@@ -138,6 +142,7 @@ export function HomePage() {
       setResultCount(response.total_results);
       setCurrentPage(response.page);
       setTotalPages(response.total_pages);
+      setDataSource(response.source);
       setItems((current) => (append ? [...current, ...response.items] : response.items));
 
       if (append) {
@@ -159,6 +164,7 @@ export function HomePage() {
         setResultCount(0);
         setCurrentPage(0);
         setTotalPages(0);
+        setDataSource(null);
         setError(message);
         setStatus("error");
       }
@@ -371,6 +377,7 @@ export function HomePage() {
       </section>
 
       <section className="results-section">
+        <DataSourceBanner source={dataSource} />
         <SectionHeader
           eyebrow={isInitialDiscovery ? "Entradas iniciais" : "Resultados"}
           title={

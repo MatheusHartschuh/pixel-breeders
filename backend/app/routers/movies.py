@@ -27,8 +27,10 @@ def get_movie(
     if current_user is not None:
         rating = db.scalar(select(Rating.rating).where(Rating.user_id == current_user.id, Rating.tmdb_id == movie_id))
     cast = movie.pop("cast", [])
+    source = movie.pop("source", None)
     return MovieDetail(
         **movie,
         cast=[CastMember(**member) for member in cast],
         user_rating=rating,
+        source=source,
     )

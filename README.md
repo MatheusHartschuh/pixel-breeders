@@ -21,7 +21,7 @@ MVP da interface de busca e avaliação de filmes usando TMDB, com backend em Py
 - Página de filmes avaliados com título, pôster e nota do usuário autenticado
 - Estados de loading e tratamento de erro
 - Persistência das avaliações no banco por usuário
-- Fallback local com fixtures caso `TMDB_API_KEY` não esteja configurada
+- Fallback local com fixtures quando `TMDB_API_KEY` não está configurada ou a TMDB falha, com origem explícita (`source`) e banner de aviso no frontend
 - Paginação e scroll infinito na listagem principal
 - Filtro por ano e gênero na busca
 - Cache em memória com TTL para busca e detalhes do TMDB
@@ -32,13 +32,36 @@ MVP da interface de busca e avaliação de filmes usando TMDB, com backend em Py
 - Refresh token e revogação de sessão no servidor
 - Recuperação de senha, verificação de e-mail e login social
 - Migrações formais com Alembic
-- Testes automatizados de integração para o fluxo de autenticação
+- Suíte completa de integração cobrindo todos os fluxos críticos, incluindo autenticação end-to-end e permissões por usuário
 
 ## Documentação interna
 
 Para um resumo rápido do estado atual da base e dos pontos que ainda faltam, veja também:
 
 - [docs/APP_STATUS.md](/home/matheuspalavrasapplicado/Documentos/Backup%20Manual/pixel-breeders/docs/APP_STATUS.md)
+
+## Testes automatizados
+
+Há uma cobertura pequena e intencionalmente focada em dois comportamentos que são fáceis de quebrar sem perceber:
+
+- fallback de fixtures com o campo `source` nas rotas de busca e detalhe, cobrindo tanto `fixture` quanto `tmdb`
+- upsert de avaliação autenticada, garantindo uma única linha por `(user_id, tmdb_id)` e a nota mais recente
+
+Esses testes ficam em `backend/tests/` e usam `pytest` com `TestClient` do FastAPI. Eles isolam o banco com SQLite de teste e fazem monkeypatch do cliente TMDB para não haver rede real.
+
+Arquivos cobertos hoje:
+
+- `backend/tests/test_fallback.py`
+- `backend/tests/test_ratings.py`
+
+Para executar:
+
+```bash
+cd backend
+pytest tests -q
+```
+
+Uma suíte completa de integração ficou fora do escopo por tempo.
 
 ## Como rodar com Docker
 
@@ -67,6 +90,8 @@ Para um resumo rápido do estado atual da base e dos pontos que ainda faltam, ve
 
 ### Como confirmar que a TMDB está ativa
 
+- As respostas de `GET /api/search` e `GET /api/movies/{movie_id}` incluem `source: "tmdb"` quando vêm da API real e `source: "fixture"` quando vêm do fallback local.
+- Quando o fallback está ativo, o frontend exibe um banner visível de dados de exemplo.
 - Se as buscas retornarem pôsteres em `image.tmdb.org`, o backend está usando a API real.
 - Se aparecerem apenas filmes de demonstração como `The Matrix`, `Inception` e `Interstellar`, o backend entrou no fallback local.
 - O fallback acontece automaticamente se `TMDB_API_KEY` estiver ausente ou se a API da TMDB estiver indisponível.
@@ -119,10 +144,18 @@ Você também pode ajustar o cache do TMDB com:
 - `DELETE /api/ratings/{movie_id}`
 
 As rotas de avaliação exigem `Authorization: Bearer <token>`.
+As respostas de busca e detalhe incluem o campo `source`, que permite distinguir dados reais da TMDB de dados de exemplo.
 
 ## Observação sobre o TMDB
 
-Se `TMDB_API_KEY` não estiver definida, o backend usa um conjunto local de filmes de demonstração para manter o MVP funcional.
+Se `TMDB_API_KEY` não estiver definida, o backend usa um conjunto local de filmes de demonstração para manter o MVP funcional. O mesmo fallback também é usado quando a chamada à TMDB falha por timeout, indisponibilidade ou outro erro HTTP.
+
+Esse fallback existe para robustez de desenvolvimento e para não quebrar o fluxo do app quando a integração externa estiver indisponível. Ele não substitui o consumo real da API da TMDB, que continua sendo o comportamento esperado para avaliação do projeto.
+
+As respostas de busca e detalhe trazem o campo `source` para deixar explícita a origem do dado:
+
+- `source: "tmdb"` quando a integração externa respondeu com sucesso
+- `source: "fixture"` quando o backend precisou cair nos dados locais
 
 Quando a chave estiver ativa, o backend cacheia respostas de busca e detalhes em memória por processo. Isso reduz chamadas repetidas ao TMDB durante navegação, paginação e reabertura dos mesmos filmes.
 

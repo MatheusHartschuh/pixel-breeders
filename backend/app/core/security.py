@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
+from fastapi import Request
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
@@ -77,6 +78,31 @@ def _get_user_id_from_token(token: str) -> int:
         ) from exc
 
 
+def _get_token_from_request(request: Request) -> str | None:
+    authorization = request.headers.get("authorization")
+    if not authorization:
+        return None
+
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return None
+
+    return token
+
+
+def get_current_user_from_request(request: Request, db: Session) -> User | None:
+    token = _get_token_from_request(request)
+    if token is None:
+        return None
+
+    try:
+        user_id = _get_user_id_from_token(token)
+    except HTTPException:
+        return None
+
+    return db.get(User, user_id)
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
@@ -99,15 +125,7 @@ def get_current_user(
 
 
 def get_current_user_optional(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    request: Request,
     db: Session = Depends(get_db),
 ) -> User | None:
-    if credentials is None:
-        return None
-
-    try:
-        user_id = _get_user_id_from_token(credentials.credentials)
-    except HTTPException:
-        return None
-
-    return db.get(User, user_id)
+    return get_current_user_from_request(request, db)

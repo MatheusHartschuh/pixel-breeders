@@ -9,6 +9,20 @@ import type {
 } from "./types";
 import { readAuthToken } from "./auth/storage";
 
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+export function isUnauthorizedError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401;
+}
+
 async function readError(response: Response): Promise<string> {
   function extractMessage(value: unknown): string | null {
     if (typeof value === "string") {
@@ -64,7 +78,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(await readError(response));
+    throw new ApiError(response.status, await readError(response));
   }
 
   if (response.status === 204) {
