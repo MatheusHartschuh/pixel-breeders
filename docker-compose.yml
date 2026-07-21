@@ -2,13 +2,13 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: pixel_breeders
+      POSTGRES_DB: pixel_breeders_auth
       POSTGRES_USER: pixel
       POSTGRES_PASSWORD: pixel
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata_auth:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pixel -d pixel_breeders"]
+      test: ["CMD-SHELL", "pg_isready -U pixel -d pixel_breeders_auth"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -17,7 +17,10 @@ services:
     build:
       context: ./backend
     environment:
-      DATABASE_URL: postgresql+psycopg://pixel:pixel@db:5432/pixel_breeders
+      DATABASE_URL: postgresql+psycopg://pixel:pixel@db:5432/pixel_breeders_auth
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-pixel-breeders-dev-secret}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
       TMDB_API_KEY: ${TMDB_API_KEY:-}
       CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
     depends_on:
@@ -35,4 +38,4 @@ services:
       - "3000:80"
 
 volumes:
-  pgdata:
+  pgdata_auth:

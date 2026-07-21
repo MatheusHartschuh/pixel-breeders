@@ -1,20 +1,34 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { useAuth } from "../auth/AuthProvider";
 import { deleteRating, listRatings } from "../api";
 import { MovieCard } from "../components/MovieCard";
 import type { MovieSummary, RatingRecord } from "../types";
 
 export function RatedPage() {
+  const { user, isCheckingSession, logout } = useAuth();
   const [ratings, setRatings] = useState<RatingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const nextPath = encodeURIComponent("/rated");
 
   useEffect(() => {
     document.title = "Pixel Breeders | Filmes avaliados";
   }, []);
 
   useEffect(() => {
+    if (isCheckingSession) {
+      return;
+    }
+
+    if (!user) {
+      setRatings([]);
+      setLoading(false);
+      setError("");
+      return;
+    }
+
     const controller = new AbortController();
     setLoading(true);
     setError("");
@@ -33,14 +47,27 @@ export function RatedPage() {
           return;
         }
 
-        setError(requestError instanceof Error ? requestError.message : "Não foi possível carregar as avaliações");
+        const message = requestError instanceof Error ? requestError.message : "Não foi possível carregar as avaliações";
+        if (message.includes("Autenticação obrigatória") || message.includes("Token inválido ou expirado")) {
+          logout();
+          setRatings([]);
+          setLoading(false);
+          setError("");
+          return;
+        }
+
+        setError(message);
         setLoading(false);
       });
 
     return () => controller.abort();
-  }, []);
+  }, [isCheckingSession, user, logout]);
 
   async function handleDelete(movieId: number) {
+    if (!user) {
+      return;
+    }
+
     if (!window.confirm("Remover esta avaliação?")) {
       return;
     }
@@ -49,7 +76,11 @@ export function RatedPage() {
       await deleteRating(movieId);
       setRatings((current) => current.filter((item) => item.tmdb_id !== movieId));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Não foi possível remover a avaliação");
+      const message = requestError instanceof Error ? requestError.message : "Não foi possível remover a avaliação";
+      if (message.includes("Autenticação obrigatória") || message.includes("Token inválido ou expirado")) {
+        logout();
+      }
+      setError(message);
     }
   }
 
@@ -92,6 +123,29 @@ export function RatedPage() {
 
   // Seleciona o conteúdo principal conforme o estado do carregamento.
   const pageState = (() => {
+    if (isCheckingSession) {
+      return <RatedPageSkeleton />;
+    }
+
+    if (!user) {
+      return (
+        <StateMessage
+          title="Entre para ver suas avaliações"
+          description="O login libera a lista pessoal de filmes avaliados e mantém suas notas separadas de outras contas."
+          action={
+            <div className="auth-page__links">
+              <Link className="button button--primary" to={`/login?next=${nextPath}`}>
+                Entrar
+              </Link>
+              <Link className="button button--secondary" to={`/register?next=${nextPath}`}>
+                Criar conta
+              </Link>
+            </div>
+          }
+        />
+      );
+    }
+
     if (loading) {
       return <RatedPageSkeleton />;
     }
@@ -132,7 +186,7 @@ export function RatedPage() {
     <div className="page">
       <section className="results-section">
         {sectionHeading}
-        {statsRow}
+        {user ? statsRow : null}
         {pageState}
       </section>
     </div>

@@ -26,6 +26,23 @@ export interface SearchResponse {
   total_results: number;
 }
 
+export interface AuthCredentials {
+  username: string;
+  password: string;
+}
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: AuthUser;
+}
+
 export interface RatingRecord {
   id: number;
   tmdb_id: number;

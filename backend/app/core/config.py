@@ -9,12 +9,17 @@ class Settings(BaseSettings):
     app_name: str = "Pixel Breeders API"
     api_prefix: str = "/api"
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
-    database_url: str = "sqlite:///./pixel_breeders.db"
+    database_url: str = "sqlite:///./pixel_breeders_auth.db"
+    jwt_secret_key: str = "pixel-breeders-dev-secret"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 10080
     tmdb_api_key: str | None = None
     tmdb_base_url: str = "https://api.themoviedb.org/3"
     tmdb_image_base_url: str = "https://image.tmdb.org/t/p/w500"
     tmdb_language: str = "pt-BR"
     tmdb_timeout: float = 10.0
+    tmdb_cache_ttl_seconds: int = 300
+    tmdb_cache_max_entries: int = 256
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
+import { useAuth } from "../auth/AuthProvider";
 import { createRating, deleteRating, getMovie, updateRating } from "../api";
 import { MoviePoster } from "../components/MoviePoster";
 import { RatingStars } from "../components/RatingStars";
@@ -9,7 +10,10 @@ import type { MovieDetail } from "../types";
 
 export function MoviePage() {
   const params = useParams();
+  const location = useLocation();
+  const { user, isCheckingSession, logout } = useAuth();
   const movieId = Number(params.movieId);
+  const nextPath = encodeURIComponent(`${location.pathname}${location.search}`);
 
   const [movie, setMovie] = useState<MovieDetail | null>(null);
   const [selectedRating, setSelectedRating] = useState(0);
@@ -57,7 +61,7 @@ export function MoviePage() {
   }, [movieId]);
 
   async function handleSave() {
-    if (!movie || selectedRating < 1) {
+    if (!movie || selectedRating < 1 || !user) {
       return;
     }
 
@@ -75,21 +79,23 @@ export function MoviePage() {
         rating: selectedRating,
       };
 
-      const savedRating = movie.user_rating
-        ? await updateRating(movie.id, selectedRating)
-        : await createRating(payload);
+      const savedRating = movie.user_rating ? await updateRating(movie.id, selectedRating) : await createRating(payload);
 
       setMovie((current) => (current ? { ...current, user_rating: savedRating.rating } : current));
       setStatusMessage("Avaliação salva com sucesso.");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Não foi possível salvar a avaliação");
+      const message = requestError instanceof Error ? requestError.message : "Não foi possível salvar a avaliação";
+      if (message.includes("Autenticação obrigatória") || message.includes("Token inválido ou expirado")) {
+        logout();
+      }
+      setError(message);
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete() {
-    if (!movie?.user_rating) {
+    if (!movie?.user_rating || !user) {
       return;
     }
 
@@ -103,7 +109,11 @@ export function MoviePage() {
       setSelectedRating(0);
       setStatusMessage("Avaliação removida.");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Não foi possível remover a avaliação");
+      const message = requestError instanceof Error ? requestError.message : "Não foi possível remover a avaliação";
+      if (message.includes("Autenticação obrigatória") || message.includes("Token inválido ou expirado")) {
+        logout();
+      }
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -174,29 +184,64 @@ export function MoviePage() {
   // Agrupa a área de avaliação com nota atual, estrelas e ações de persistência.
   const ratingPanel = (
     <div className="panel panel--rating">
-      <div className="panel__header">
-        <div>
-          <h2>{hasRating ? "Editar avaliação" : "Avaliar filme"}</h2>
-          <p>Escolha uma nota de 1 a 5 e grave no banco.</p>
-        </div>
+      {isCheckingSession ? (
+        <>
+          <div className="panel__header">
+            <div>
+              <h2>Carregando sessão</h2>
+              <p>Estamos verificando seu acesso para liberar a avaliação.</p>
+            </div>
+          </div>
+          <div className="skeleton skeleton--line skeleton--section" />
+          <div className="skeleton skeleton--rating" />
+        </>
+      ) : user ? (
+        <>
+          <div className="panel__header">
+            <div>
+              <h2>{hasRating ? "Editar avaliação" : "Avaliar filme"}</h2>
+              <p>Escolha uma nota de 1 a 5 e grave no banco.</p>
+            </div>
 
-        {hasRating ? <span className="badge badge--soft">Nota atual {movie.user_rating}/5</span> : null}
-      </div>
+            {hasRating ? <span className="badge badge--soft">Nota atual {movie.user_rating}/5</span> : null}
+          </div>
 
-      <RatingStars value={selectedRating} onChange={setSelectedRating} size="lg" />
+          <RatingStars value={selectedRating} onChange={setSelectedRating} size="lg" />
 
-      <div className="panel__actions">
-        <button className="button button--primary" type="button" disabled={saving || selectedRating < 1} onClick={handleSave}>
-          {saving ? "Salvando..." : hasRating ? "Atualizar avaliação" : "Salvar avaliação"}
-        </button>
+          <div className="panel__actions">
+            <button className="button button--primary" type="button" disabled={saving || selectedRating < 1} onClick={handleSave}>
+              {saving ? "Salvando..." : hasRating ? "Atualizar avaliação" : "Salvar avaliação"}
+            </button>
 
-        <button className="button button--danger" type="button" disabled={saving || !hasRating} onClick={handleDelete}>
-          Remover avaliação
-        </button>
-      </div>
+            <button className="button button--danger" type="button" disabled={saving || !hasRating} onClick={handleDelete}>
+              Remover avaliação
+            </button>
+          </div>
 
-      {statusMessage ? <p className="feedback feedback--success">{statusMessage}</p> : null}
-      {error ? <p className="feedback feedback--error">{error}</p> : null}
+          {statusMessage ? <p className="feedback feedback--success">{statusMessage}</p> : null}
+          {error ? <p className="feedback feedback--error">{error}</p> : null}
+        </>
+      ) : (
+        <>
+          <div className="panel__header">
+            <div>
+              <h2>Entre para avaliar</h2>
+              <p>O login libera as ações protegidas e salva sua nota no seu perfil.</p>
+            </div>
+          </div>
+
+          <p className="auth-callout">Você pode navegar pelos detalhes sem login, mas precisa entrar para avaliar.</p>
+
+          <div className="panel__actions">
+            <Link className="button button--primary" to={`/login?next=${nextPath}`}>
+              Entrar
+            </Link>
+            <Link className="button button--secondary" to={`/register?next=${nextPath}`}>
+              Criar conta
+            </Link>
+          </div>
+        </>
+      )}
     </div>
   );
 

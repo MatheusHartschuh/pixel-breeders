@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic_core import PydanticCustomError
 
 
 class CastMember(BaseModel):
@@ -30,6 +30,44 @@ class SearchResponse(BaseModel):
     page: int
     total_pages: int
     total_results: int
+
+
+class AuthCredentials(BaseModel):
+    username: str = Field()
+    password: str = Field()
+
+    @field_validator("username")
+    @classmethod
+    def normalize_username(cls, value: str) -> str:
+        normalized = value.strip().casefold()
+        if len(normalized) < 3:
+            raise PydanticCustomError("username_too_short", "O nome de usuário deve ter pelo menos 3 caracteres")
+        if len(normalized) > 50:
+            raise PydanticCustomError("username_too_long", "O nome de usuário deve ter no máximo 50 caracteres")
+        return normalized
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        if len(value) < 6:
+            raise PydanticCustomError("password_too_short", "A senha deve ter pelo menos 6 caracteres.")
+        if len(value) > 128:
+            raise PydanticCustomError("password_too_long", "A senha deve ter no máximo 128 caracteres.")
+        return value
+
+
+class UserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    created_at: datetime
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserRead
 
 
 class RatingBase(BaseModel):

@@ -3,31 +3,41 @@ from sqlalchemy.orm import Session
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
+from app.core.security import get_current_user
 from app.db import get_db
-from app.models import Rating
+from app.models import Rating, User
 from app.schemas import RatingCreate, RatingRead, RatingUpdate
 
 router = APIRouter(tags=["ratings"])
 
 
-def _get_rating_or_404(db: Session, tmdb_id: int) -> Rating:
-    rating = db.scalar(select(Rating).where(Rating.tmdb_id == tmdb_id))
+def _get_rating_or_404(db: Session, user_id: int, tmdb_id: int) -> Rating:
+    rating = db.scalar(select(Rating).where(Rating.user_id == user_id, Rating.tmdb_id == tmdb_id))
     if rating is None:
-        raise HTTPException(status_code=404, detail="Rating not found")
+        raise HTTPException(status_code=404, detail="Avaliação não encontrada.")
     return rating
 
 
 @router.get("/ratings", response_model=list[RatingRead])
-def list_ratings(db: Session = Depends(get_db)) -> list[RatingRead]:
-    ratings = db.scalars(select(Rating).order_by(Rating.updated_at.desc())).all()
+def list_ratings(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[RatingRead]:
+    ratings = db.scalars(
+        select(Rating).where(Rating.user_id == current_user.id).order_by(Rating.updated_at.desc())
+    ).all()
     return list(ratings)
 
 
 @router.post("/ratings", response_model=RatingRead, status_code=status.HTTP_201_CREATED)
-def create_rating(payload: RatingCreate, db: Session = Depends(get_db)) -> RatingRead:
-    rating = db.scalar(select(Rating).where(Rating.tmdb_id == payload.tmdb_id))
+def create_rating(
+    payload: RatingCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> RatingRead:
+    rating = db.scalar(
+        select(Rating).where(Rating.user_id == current_user.id, Rating.tmdb_id == payload.tmdb_id)
+    )
     if rating is None:
         rating = Rating(
+            user_id=current_user.id,
             tmdb_id=payload.tmdb_id,
             title=payload.title,
             poster_url=payload.poster_url,
@@ -49,8 +59,13 @@ def create_rating(payload: RatingCreate, db: Session = Depends(get_db)) -> Ratin
 
 
 @router.patch("/ratings/{tmdb_id}", response_model=RatingRead)
-def update_rating(tmdb_id: int, payload: RatingUpdate, db: Session = Depends(get_db)) -> RatingRead:
-    rating = _get_rating_or_404(db, tmdb_id)
+def update_rating(
+    tmdb_id: int,
+    payload: RatingUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> RatingRead:
+    rating = _get_rating_or_404(db, current_user.id, tmdb_id)
     rating.rating = payload.rating
     db.commit()
     db.refresh(rating)
@@ -58,8 +73,8 @@ def update_rating(tmdb_id: int, payload: RatingUpdate, db: Session = Depends(get
 
 
 @router.delete("/ratings/{tmdb_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_rating(tmdb_id: int, db: Session = Depends(get_db)) -> Response:
-    rating = _get_rating_or_404(db, tmdb_id)
+def delete_rating(tmdb_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Response:
+    rating = _get_rating_or_404(db, current_user.id, tmdb_id)
     db.delete(rating)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
