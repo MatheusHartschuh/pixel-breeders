@@ -1,0 +1,129 @@
+TESTE DE ESTÁGIO · 2026
+
+Teste para vaga de Estágio em Desenvolvimento
+Web
+Interface de busca de filmes usando a API pública do The Movie Database (TMDB) —
+developer.themoviedb.org/docs/getting-started
+
+STACK
+
+Frontend React + TypeScript
+
+Backend Python (Django / Flask / …)
+
+Banco de Dados À escolha do candidato
+
+Infraestrutura Docker
+
+OBJETIVO
+
+•
+
+Exibir os resultados da pesquisa mostrando pôster e título
+
+•
+
+Permitir clicar em um filme para ver informações detalhadas: elenco, sinopse e data de lançamento
+
+•
+
+Sistema de avaliação com nota de 1 a 5, editável e deletável
+
+•
+
+Página "Filmes Avaliados" listando todos os filmes que o usuário já avaliou
+
+FEATURES NECESSÁRIAS
+
+Página Principal
+
+Modal / Página do Filme
+
+Página "Filmes Avaliados"
+
+› Barra de pesquisa via API do TMDB
+
+› Sinopse, data de lançamento,
+
+› Listagem dos filmes avaliados
+
+› Listagem de resultados
+
+elenco
+
+› Título, pôster + nota do usuário
+
+› Estados de loading
+
+› Sem avaliação: usuário pode dar
+
+› Ao clicar, abre modal / página do
+
+› Ao clicar, abre modal / página do
+
+uma nota
+
+filme
+
+filme
+
+› Com avaliação: editar ou remover a
+nota
+› Botão de fechar / voltar
+
+O QUE ESTÁ SENDO AVALIADO
+
+✓
+
+Consumo de APIs (TMDB)
+
+✓
+
+Criação de APIs (endpoints backend)
+
+✓
+
+Gerenciamento de estado no React
+
+✓
+
+Estados de carregamento e tratamento de erros
+
+✓
+
+Uso adequado de banco de dados
+
+Pixel Breeders — Confidencial
+
+pixelbreeders.com
+
+PONTOS EXTRAS (BÔNUS)
+
+Paginação ou Scroll Infinito
+
+Filtro por Gênero ou Ano
+
+Autenticação
+
+Implementação de Cache
+
+INSTRUÇÕES DE ENTREGA
+
+Formato: Link de repositório público no GitHub
+Obrigatório: A aplicação deve ser executável via Docker em um único comando
+README deve incluir: instruções para rodar localmente + lista de features implementadas / não implementadas
+
+OBSERVAÇÕES FINAIS
+
+Foco em qualidade e clareza, não em quantidade de features.
+Bibliotecas e frameworks adicionais são permitidos.
+Caso algo não seja implementado, explique o motivo no README.
+Ferramentas de IA são permitidas (ChatGPT, Claude, Copilot, Cursor…), mas o candidato deve compreender e
+conseguir explicar as decisões técnicas. Caso utilize IA de forma relevante, descreva no README como ela foi
+utilizada.
+
+Pixel Breeders — Confidencial
+
+pixelbreeders.com
+
+

@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "../auth/AuthProvider";
 import { deleteRating, listRatings } from "../api";
+import { MovieCard } from "../components/MovieCard";
 import { EmptyState } from "../components/layout/EmptyState";
 import { Page } from "../components/layout/Page";
 import { SectionHeader } from "../components/layout/SectionHeader";
 import { Button } from "../components/ui/Button";
-import { MovieCard } from "../components/MovieCard";
+import { formatEvaluationDate } from "../lib/format";
 import type { MovieSummary, RatingRecord } from "../types";
 
 export function RatedPage() {
@@ -50,7 +51,7 @@ export function RatedPage() {
           return;
         }
 
-        const message = requestError instanceof Error ? requestError.message : "Não foi possível carregar as avaliações";
+        const message = requestError instanceof Error ? requestError.message : "Nao foi possivel carregar as avaliacoes";
         if (message.includes("Autenticação obrigatória") || message.includes("Token inválido ou expirado")) {
           logout();
           setRatings([]);
@@ -71,7 +72,7 @@ export function RatedPage() {
       return;
     }
 
-    if (!window.confirm("Remover esta avaliação?")) {
+    if (!window.confirm("Remover esta avaliacao?")) {
       return;
     }
 
@@ -79,7 +80,7 @@ export function RatedPage() {
       await deleteRating(movieId);
       setRatings((current) => current.filter((item) => item.tmdb_id !== movieId));
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Não foi possível remover a avaliação";
+      const message = requestError instanceof Error ? requestError.message : "Nao foi possivel remover a avaliacao";
       if (message.includes("Autenticação obrigatória") || message.includes("Token inválido ou expirado")) {
         logout();
       }
@@ -87,27 +88,14 @@ export function RatedPage() {
     }
   }
 
-  const movies: MovieSummary[] = ratings.map((rating) => ({
-    id: rating.tmdb_id,
-    title: rating.title,
-    overview: rating.overview,
-    release_date: rating.release_date,
-    poster_url: rating.poster_url,
-    user_rating: rating.rating,
-  }));
-
-  const statsRow = (
-    <div className="stats-row">
-      <div className="stats-card">
-        <span className="stats-card__label">Total</span>
-        <strong>{ratings.length}</strong>
-      </div>
-      <div className="stats-card">
-        <span className="stats-card__label">Última atualização</span>
-        <strong>{ratings[0] ? new Intl.DateTimeFormat("pt-BR").format(new Date(ratings[0].updated_at)) : "Sem dados"}</strong>
-      </div>
+  const averageRating = ratings.length > 0 ? ratings.reduce((sum, rating) => sum + rating.rating, 0) / ratings.length : 0;
+  const summary = user ? (
+    <div className="collection-summary" aria-label="Resumo da colecao">
+      <span>{ratings.length} filmes</span>
+      <span>{ratings.length > 0 ? `Media ${averageRating.toFixed(1)}/5` : "Sem media ainda"}</span>
+      <span>{ratings[0] ? `Ultima entrada ${formatEvaluationDate(ratings[0].created_at)}` : "Sem registros"}</span>
     </div>
-  );
+  ) : null;
 
   const pageState = (() => {
     if (isCheckingSession) {
@@ -117,8 +105,8 @@ export function RatedPage() {
     if (!user) {
       return (
         <EmptyState
-          title="Entre para ver suas avaliações"
-          description="O login libera a lista pessoal de filmes avaliados e mantém suas notas separadas de outras contas."
+          title="Entre para ver sua colecao"
+          description="O login libera a lista pessoal de filmes avaliados e mantem suas notas separadas por conta."
           titleAs="h2"
           size="large"
           action={
@@ -139,15 +127,15 @@ export function RatedPage() {
       return <RatedPageSkeleton />;
     }
 
-    if (error) {
+    if (error && ratings.length === 0) {
       return <EmptyState title="Falha ao carregar" description={error} titleAs="h2" size="large" />;
     }
 
-    if (movies.length === 0) {
+    if (ratings.length === 0) {
       return (
         <EmptyState
-          title="Nenhuma avaliação ainda"
-          description="Busque um filme na página principal, abra os detalhes e marque sua nota."
+          title="Sua estante ainda esta vazia"
+          description="Busque um filme na pagina principal, abra os detalhes e salve sua primeira nota."
           titleAs="h2"
           size="large"
           action={<Button variant="primary" to="/">Ir para a busca</Button>}
@@ -156,36 +144,50 @@ export function RatedPage() {
     }
 
     return (
-      <div className="movie-grid">
-        {movies.map((movie) => (
-          <MovieCard
-            key={movie.id}
-            movie={movie}
-            actions={
-              <Button variant="ghost" type="button" onClick={() => handleDelete(movie.id)}>
-                Remover
-              </Button>
-            }
-          />
-        ))}
-      </div>
+      <>
+        {error ? <p className="collection-notice collection-notice--error">{error}</p> : null}
+        <div className="movie-grid">
+          {ratings.map((rating) => (
+            <MovieCard
+              key={rating.tmdb_id}
+              movie={
+                {
+                  id: rating.tmdb_id,
+                  title: rating.title,
+                  overview: rating.overview,
+                  release_date: rating.release_date,
+                  poster_url: rating.poster_url,
+                  user_rating: rating.rating,
+                } satisfies MovieSummary
+              }
+              ratingDate={formatEvaluationDate(rating.created_at)}
+              actions={
+                <Button variant="text" type="button" onClick={() => handleDelete(rating.tmdb_id)}>
+                  Remover
+                </Button>
+              }
+            />
+          ))}
+        </div>
+      </>
     );
   })();
 
   return (
-    <Page>
+    <Page className="rated-page">
       <section className="results-section">
         <SectionHeader
           eyebrow="Biblioteca pessoal"
           title="Filmes avaliados"
           titleAs="h1"
           actions={
-            <Button variant="secondary" to="/">
+            <Button variant="text" to="/">
               Voltar para a busca
             </Button>
           }
         />
-        {user ? statsRow : null}
+
+        {summary}
         {pageState}
       </section>
     </Page>
@@ -195,13 +197,17 @@ export function RatedPage() {
 function RatedPageSkeleton() {
   return (
     <div className="movie-grid">
-      {Array.from({ length: 4 }, (_, index) => (
+      {Array.from({ length: 6 }, (_, index) => (
         <article className="movie-card movie-card--skeleton" key={index}>
-          <div className="movie-card__media skeleton skeleton--poster" />
-          <div className="movie-card__body">
-            <div className="skeleton skeleton--line" />
-            <div className="skeleton skeleton--line skeleton--short" />
-            <div className="skeleton skeleton--paragraph" />
+          <div className="movie-card__link">
+            <div className="movie-card__poster">
+              <div className="skeleton skeleton--poster" />
+            </div>
+            <div className="movie-card__body">
+              <div className="skeleton skeleton--line skeleton--title" />
+              <div className="skeleton skeleton--line skeleton--short" />
+              <div className="skeleton skeleton--chips" />
+            </div>
           </div>
         </article>
       ))}

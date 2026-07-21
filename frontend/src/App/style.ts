@@ -1,12 +1,7 @@
-export const APP_SHELL_ORB_CLASSES = [
-  "app-shell__orb app-shell__orb--one",
-  "app-shell__orb app-shell__orb--two",
-] as const;
-
 export const APP_BRAND = {
   mark: "PB",
   title: "Pixel Breeders",
-  subtitle: "Filmes, notas e memória",
+  subtitle: "Arquivo de cinema",
 } as const;
 
 type AppNavItem = {

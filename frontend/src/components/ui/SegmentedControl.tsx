@@ -16,7 +16,7 @@ interface SegmentedControlProps<TValue extends string> {
 
 export function SegmentedControl<TValue extends string>({ ariaLabel, value, options, onChange }: SegmentedControlProps<TValue>) {
   return (
-    <div className="segmented-control" role="tablist" aria-label={ariaLabel}>
+    <div className="segmented-control" role="group" aria-label={ariaLabel}>
       {options.map((option) => (
         <Button
           key={option.value}

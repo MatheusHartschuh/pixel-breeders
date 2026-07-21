@@ -1,11 +1,10 @@
 import { Link } from "react-router-dom";
 
-import { formatReleaseDate } from "../../lib/format";
+import { formatReleaseYear, formatRating, formatVoteAverage } from "../../lib/format";
 import type { AuthUser, CastMember, MovieDetail } from "../../types";
 import { MoviePoster } from "../MoviePoster";
 import { RatingStars } from "../RatingStars";
 import { Page } from "../layout/Page";
-import { Panel } from "../layout/Panel";
 import { Button } from "../ui/Button";
 
 interface MovieDetailViewProps {
@@ -36,26 +35,65 @@ export function MovieDetailView({
   nextPath,
 }: MovieDetailViewProps) {
   const hasRating = typeof movie.user_rating === "number";
+  const currentRating = movie.user_rating ?? 0;
+  const year = formatReleaseYear(movie.release_date);
+  const tmdbRating = formatVoteAverage(movie.vote_average);
 
   return (
-    <Page>
-      <section className="detail-layout">
-        <div className="detail-layout__media">
-          <MoviePoster title={movie.title} posterUrl={movie.poster_url} className="movie-poster--detail" />
-        </div>
+    <Page className="movie-page">
+      <div className="movie-page__crumbs" aria-label="Caminho da pagina">
+        <Link to="/">Busca</Link>
+        <span aria-hidden="true">/</span>
+        <Link to="/rated">Avaliados</Link>
+      </div>
 
-        <div className="detail-layout__content">
-          <Breadcrumb />
-          <MovieHeader movie={movie} hasRating={hasRating} />
-          <Panel title="Sinopse">
-            <p>{movie.overview || "Sinopse indisponível."}</p>
-          </Panel>
-          <Panel title="Elenco">
-            {movie.cast.length > 0 ? <CastList cast={movie.cast} /> : <p>Elenco indisponível.</p>}
-          </Panel>
-          <RatingPanel
+      <section className="movie-page__layout">
+        <aside className="movie-page__poster-column">
+          <MoviePoster title={movie.title} posterUrl={movie.poster_url} className="movie-poster--detail" />
+
+          <div className="movie-page__poster-meta" aria-label="Resumo rapido">
+            <span>{year}</span>
+            <span>TMDB {tmdbRating}</span>
+          </div>
+        </aside>
+
+        <article className="movie-page__content">
+          <header className="movie-page__header">
+            <span className="eyebrow">Detalhe do filme</span>
+            <h1>{movie.title}</h1>
+            <p className="movie-page__meta">
+              <span>{year}</span>
+              <span>TMDB {tmdbRating}</span>
+              <span>{hasRating ? "Já avaliado" : "Ainda sem avaliação"}</span>
+            </p>
+
+            <div className="movie-page__rating-summary" aria-label="Sua avaliacao">
+              <span className="movie-page__rating-label">Minha nota</span>
+              <strong>{hasRating ? formatRating(movie.user_rating) : "Sem nota"}</strong>
+              <p>{hasRating ? "A avaliação ja faz parte da sua colecao." : "A sua nota aparece aqui depois do salvamento."}</p>
+            </div>
+          </header>
+
+          <section className="movie-section movie-section--synopsis" aria-labelledby="sinopse-title">
+            <div className="movie-section__header">
+              <span className="section-heading__eyebrow">Sinopse</span>
+              <h2 id="sinopse-title">O que o filme conta</h2>
+            </div>
+            <p>{movie.overview || "Sinopse indisponivel."}</p>
+          </section>
+
+          <section className="movie-section movie-section--cast" aria-labelledby="elenco-title">
+            <div className="movie-section__header">
+              <span className="section-heading__eyebrow">Elenco</span>
+              <h2 id="elenco-title">Quem da vida ao filme</h2>
+            </div>
+            {movie.cast.length > 0 ? <CastList cast={movie.cast} /> : <p className="movie-section__empty">Elenco indisponivel.</p>}
+          </section>
+
+          <RatingModule
             movie={movie}
             hasRating={hasRating}
+            currentRating={currentRating}
             selectedRating={selectedRating}
             onRatingChange={onRatingChange}
             onSave={onSave}
@@ -67,7 +105,7 @@ export function MovieDetailView({
             isCheckingSession={isCheckingSession}
             nextPath={nextPath}
           />
-        </div>
+        </article>
       </section>
     </Page>
   );
@@ -75,50 +113,33 @@ export function MovieDetailView({
 
 export function MovieDetailSkeleton() {
   return (
-    <Page>
-      <section className="detail-layout">
+    <Page className="movie-page">
+      <div className="movie-page__crumbs">
+        <div className="skeleton skeleton--crumb" />
+      </div>
+
+      <section className="movie-page__layout">
         <div className="movie-poster movie-poster--detail skeleton skeleton--poster" />
-        <div className="detail-layout__content">
+
+        <div className="movie-page__content">
           <div className="skeleton skeleton--line skeleton--title" />
           <div className="skeleton skeleton--line skeleton--short" />
-          <div className="panel">
+          <div className="movie-section">
             <div className="skeleton skeleton--line skeleton--section" />
             <div className="skeleton skeleton--paragraph" />
           </div>
-          <div className="panel">
+          <div className="movie-section">
             <div className="skeleton skeleton--line skeleton--section" />
             <div className="skeleton skeleton--paragraph" />
           </div>
-          <div className="panel">
+          <div className="movie-page__rating-panel movie-page__rating-panel--loading">
             <div className="skeleton skeleton--line skeleton--section" />
             <div className="skeleton skeleton--rating" />
+            <div className="skeleton skeleton--line skeleton--short" />
           </div>
         </div>
       </section>
     </Page>
-  );
-}
-
-function Breadcrumb() {
-  return (
-    <div className="breadcrumb">
-      <Link to="/">Busca</Link>
-      <span> / </span>
-      <Link to="/rated">Avaliados</Link>
-    </div>
-  );
-}
-
-function MovieHeader({ movie, hasRating }: { movie: MovieDetail; hasRating: boolean }) {
-  return (
-    <header className="detail-layout__header">
-      <span className="eyebrow">Detalhes do filme</span>
-      <h1>{movie.title}</h1>
-      <p className="detail-layout__meta">
-        <span>{formatReleaseDate(movie.release_date)}</span>
-        {hasRating ? <span className="badge badge--accent">Já avaliado</span> : <span className="badge">Sem nota</span>}
-      </p>
-    </header>
   );
 }
 
@@ -135,9 +156,10 @@ function CastList({ cast }: { cast: CastMember[] }) {
   );
 }
 
-function RatingPanel({
+function RatingModule({
   movie,
   hasRating,
+  currentRating,
   selectedRating,
   onRatingChange,
   onSave,
@@ -148,23 +170,32 @@ function RatingPanel({
   user,
   isCheckingSession,
   nextPath,
-}: MovieDetailViewProps & { hasRating: boolean }) {
-  const currentRating = movie.user_rating ?? 0;
-
+}: MovieDetailViewProps & {
+  hasRating: boolean;
+  currentRating: number;
+}) {
   if (isCheckingSession) {
     return (
-      <Panel className="panel--rating" title="Carregando sessão" description="Estamos verificando seu acesso para liberar a avaliação.">
+      <section className="movie-page__rating-panel movie-page__rating-panel--loading" aria-labelledby="avaliacao-title">
+        <div className="movie-section__header">
+          <span className="section-heading__eyebrow">Avaliação</span>
+          <h2 id="avaliacao-title">Carregando sessao</h2>
+        </div>
         <div className="skeleton skeleton--line skeleton--section" />
         <div className="skeleton skeleton--rating" />
-      </Panel>
+      </section>
     );
   }
 
   if (!user) {
     return (
-      <Panel className="panel--rating" title="Entre para avaliar" description="O login libera as ações protegidas e salva sua nota no seu perfil.">
-        <p className="auth-callout">Você pode navegar pelos detalhes sem login, mas precisa entrar para avaliar.</p>
-        <div className="panel__actions">
+      <section className="movie-page__rating-panel movie-page__rating-panel--prompt" aria-labelledby="avaliacao-title">
+        <div className="movie-section__header">
+          <span className="section-heading__eyebrow">Avaliação</span>
+          <h2 id="avaliacao-title">Entre para avaliar</h2>
+        </div>
+        <p className="movie-page__rating-copy">O login libera a nota pessoal e salva tudo na sua colecao.</p>
+        <div className="movie-page__actions">
           <Button variant="primary" to={`/login?next=${nextPath}`}>
             Entrar
           </Button>
@@ -172,31 +203,35 @@ function RatingPanel({
             Criar conta
           </Button>
         </div>
-      </Panel>
+      </section>
     );
   }
 
   return (
-    <Panel
-      className="panel--rating"
-      title={hasRating ? "Editar avaliação" : "Avaliar filme"}
-      description="Escolha uma nota de 1 a 5 e grave no banco."
-      aside={hasRating ? <span className="badge badge--soft">Nota atual {currentRating}/5</span> : null}
-    >
+    <section className={`movie-page__rating-panel ${hasRating ? "movie-page__rating-panel--rated" : ""}`} aria-labelledby="avaliacao-title">
+      <div className="movie-page__rating-top">
+        <div>
+          <span className="section-heading__eyebrow">Avaliação</span>
+          <h2 id="avaliacao-title">{hasRating ? "Editar sua nota" : "Salvar sua nota"}</h2>
+          <p className="movie-page__rating-copy">Escolha uma nota de 1 a 5 e mantenha o filme na sua estante pessoal.</p>
+        </div>
+        <span className="badge badge--accent">{hasRating ? `Atual ${currentRating}/5` : "Sem nota salva"}</span>
+      </div>
+
       <RatingStars value={selectedRating} onChange={onRatingChange} size="lg" />
 
-      <div className="panel__actions">
+      <div className="movie-page__actions">
         <Button variant="primary" type="button" disabled={saving || selectedRating < 1} onClick={onSave}>
           {saving ? "Salvando..." : hasRating ? "Atualizar avaliação" : "Salvar avaliação"}
         </Button>
 
-        <Button variant="danger" type="button" disabled={saving || !hasRating} onClick={onDelete}>
+        <Button variant="ghost" type="button" disabled={saving || !hasRating} onClick={onDelete}>
           Remover avaliação
         </Button>
       </div>
 
       {statusMessage ? <p className="feedback feedback--success">{statusMessage}</p> : null}
       {error ? <p className="feedback feedback--error">{error}</p> : null}
-    </Panel>
+    </section>
   );
 }

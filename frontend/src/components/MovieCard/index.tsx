@@ -2,56 +2,43 @@ import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 
 import type { MovieSummary } from "../../types";
-import { formatReleaseDate } from "../../lib/format";
+import { formatReleaseYear, formatRating, formatVoteAverage } from "../../lib/format";
 import { MoviePoster } from "../MoviePoster";
-import { RatingStars } from "../RatingStars";
 import { MOVIE_CARD_CLASSNAMES, MOVIE_CARD_COPY } from "./style";
 
 interface MovieCardProps {
   movie: MovieSummary;
   actions?: ReactNode;
+  ratingDate?: string;
 }
 
-export function MovieCard({ movie, actions }: MovieCardProps) {
-  // Destaca quando o filme já recebeu uma nota do usuário.
-  const ratingBadge = typeof movie.user_rating === "number" ? (
-    <span className="badge badge--soft">
-      {MOVIE_CARD_COPY.userRatingPrefix} {movie.user_rating}/5
-    </span>
-  ) : null;
-
-  // Exibe a sinopse somente quando houver texto disponível.
-  const overview = movie.overview ? <p className={MOVIE_CARD_CLASSNAMES.overview}>{movie.overview}</p> : null;
-
-  // Mostra as estrelas preenchidas para a avaliação já salva.
-  const ratingStars = typeof movie.user_rating === "number" ? (
-    <div className={MOVIE_CARD_CLASSNAMES.rating}>
-      <RatingStars value={movie.user_rating} size="sm" />
-    </div>
-  ) : null;
-
-  // Agrupa as ações opcionais recebidas pelo card.
+export function MovieCard({ movie, actions, ratingDate }: MovieCardProps) {
+  const tmdbRating = formatVoteAverage(movie.vote_average);
+  const userRating = typeof movie.user_rating === "number" ? formatRating(movie.user_rating) : null;
   const cardActions = actions ? <div className={MOVIE_CARD_CLASSNAMES.actions}>{actions}</div> : null;
 
-  // Monta o conteúdo principal do card com link para a página do filme.
   const movieCardContent = (
-    <Link to={`/movie/${movie.id}`} className={MOVIE_CARD_CLASSNAMES.link}>
-      <div className={MOVIE_CARD_CLASSNAMES.media}>
+    <Link to={`/movie/${movie.id}`} className={MOVIE_CARD_CLASSNAMES.link} aria-label={`Abrir ${movie.title}`}>
+      <div className={MOVIE_CARD_CLASSNAMES.poster}>
         <MoviePoster title={movie.title} posterUrl={movie.poster_url} />
       </div>
 
       <div className={MOVIE_CARD_CLASSNAMES.body}>
-        <div className={MOVIE_CARD_CLASSNAMES.heading}>
+        <div className={MOVIE_CARD_CLASSNAMES.titleRow}>
           <h3 className={MOVIE_CARD_CLASSNAMES.title}>{movie.title}</h3>
-
-          {ratingBadge}
+          <span className={MOVIE_CARD_CLASSNAMES.year}>{formatReleaseYear(movie.release_date)}</span>
         </div>
 
-        <p className={MOVIE_CARD_CLASSNAMES.meta}>{formatReleaseDate(movie.release_date)}</p>
+        <div className={MOVIE_CARD_CLASSNAMES.scores}>
+          <span className={`${MOVIE_CARD_CLASSNAMES.score} movie-card__score--tmdb`}>TMDB {tmdbRating}</span>
+          {userRating ? (
+            <span className={`${MOVIE_CARD_CLASSNAMES.score} movie-card__score--user`}>
+              {MOVIE_CARD_COPY.userRatingPrefix} {userRating}
+            </span>
+          ) : null}
+        </div>
 
-        {overview}
-
-        {ratingStars}
+        {ratingDate ? <p className={MOVIE_CARD_CLASSNAMES.ratingDate}>Avaliada em {ratingDate}</p> : null}
       </div>
     </Link>
   );

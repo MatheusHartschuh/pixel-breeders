@@ -18,12 +18,11 @@ function hashString(value: string): number {
   return Math.abs(hash);
 }
 
-function createPalette(seed: string): [string, string, string] {
+function createPalette(seed: string): [string, string] {
   const hash = hashString(seed);
-  const hue = hash % 360;
-  const secondHue = (hue + 42) % 360;
-  const thirdHue = (hue + 180) % 360;
-  return [`hsl(${hue} 80% 34%)`, `hsl(${secondHue} 85% 48%)`, `hsl(${thirdHue} 80% 20%)`];
+  const glow = 20 + (hash % 18);
+  const frame = 12 + (hash % 8);
+  return [`rgba(200, 169, 106, ${glow / 100})`, `rgba(245, 243, 238, ${frame / 100})`];
 }
 
 function getMonogram(title: string): string {
@@ -45,31 +44,31 @@ function getMonogram(title: string): string {
 
 function createPlaceholder(title: string): string {
   const monogram = getMonogram(title);
-  const [background, glow, accent] = createPalette(title);
+  const [glow, accent] = createPalette(title);
   const escapedTitle = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="${PLACEHOLDER_VIEWBOX}" role="img" aria-label="${escapedTitle}">
       <defs>
         <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="${background}" />
-          <stop offset="100%" stop-color="${accent}" />
+          <stop offset="0%" stop-color="#111315" />
+          <stop offset="100%" stop-color="#1b1e22" />
         </linearGradient>
-        <radialGradient id="glow" cx="50%" cy="28%" r="70%">
-          <stop offset="0%" stop-color="${glow}" stop-opacity="0.75" />
+        <radialGradient id="glow" cx="50%" cy="24%" r="68%">
+          <stop offset="0%" stop-color="${glow}" stop-opacity="0.85" />
           <stop offset="100%" stop-color="${glow}" stop-opacity="0" />
         </radialGradient>
       </defs>
       <rect width="${PLACEHOLDER_WIDTH}" height="${PLACEHOLDER_HEIGHT}" fill="url(#bg)" rx="40" />
-      <circle cx="470" cy="120" r="190" fill="url(#glow)" />
-      <circle cx="140" cy="720" r="150" fill="rgba(255,255,255,0.1)" />
-      <rect x="44" y="44" width="512" height="812" rx="28" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4" />
-      <text x="50%" y="48%" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-size="112" font-family="Verdana, sans-serif" font-weight="700" letter-spacing="6">
+      <circle cx="468" cy="108" r="188" fill="url(#glow)" />
+      <rect x="42" y="42" width="516" height="816" rx="30" fill="none" stroke="rgba(245,243,238,0.12)" stroke-width="4" />
+      <rect x="88" y="86" width="424" height="728" rx="20" fill="none" stroke="${accent}" stroke-width="2" />
+      <text x="50%" y="47%" text-anchor="middle" dominant-baseline="middle" fill="#f5f3ee" font-size="104" font-family="Georgia, 'Times New Roman', serif" font-weight="700" letter-spacing="4">
         ${monogram}
       </text>
-      <text x="50%" y="62%" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,0.86)" font-size="28" font-family="Verdana, sans-serif" letter-spacing="5">
+      <text x="50%" y="61%" text-anchor="middle" dominant-baseline="middle" fill="rgba(245,243,238,0.82)" font-size="28" font-family="Arial, Helvetica, sans-serif" letter-spacing="5">
         ${PLACEHOLDER_TITLE}
       </text>
-      <text x="50%" y="83%" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,0.72)" font-size="24" font-family="Verdana, sans-serif" letter-spacing="2">
+      <text x="50%" y="82%" text-anchor="middle" dominant-baseline="middle" fill="${accent}" font-size="24" font-family="Arial, Helvetica, sans-serif" letter-spacing="2">
         ${PLACEHOLDER_FOOTER}
       </text>
     </svg>

@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffb703" />
-      <stop offset="100%" stop-color="#ff6b6b" />
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1b1e22" />
+      <stop offset="100%" stop-color="#111315" />
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="16" fill="url(#g)" />
-  <path d="M18 20h28a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V24a4 4 0 0 1 4-4Zm6 6v12l11-6-11-6Z" fill="#07111b"/>
+  <rect width="64" height="64" rx="18" fill="url(#bg)" />
+  <rect x="12" y="12" width="40" height="40" rx="12" fill="none" stroke="rgba(200,169,106,0.45)" stroke-width="2" />
+  <text x="32" y="37" text-anchor="middle" fill="#c8a96a" font-size="19" font-family="Georgia, 'Times New Roman', serif" font-weight="700" letter-spacing="1.2">PB</text>
 </svg>

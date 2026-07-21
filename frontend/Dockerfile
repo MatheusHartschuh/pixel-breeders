@@ -7,16 +7,19 @@ WORKDIR /app
 COPY package*.json ./
 ENV NPM_CONFIG_FUND=false \
     NPM_CONFIG_AUDIT=false \
-    NPM_CONFIG_FETCH_TIMEOUT=600000 \
-    NPM_CONFIG_FETCH_RETRIES=5 \
-    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
-    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_REGISTRY=https://registry.npmjs.org/ \
+    NPM_CONFIG_FETCH_TIMEOUT=1200000 \
+    NPM_CONFIG_FETCH_RETRIES=10 \
+    NPM_CONFIG_FETCH_RETRY_FACTOR=10 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=30000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=600000 \
     NPM_CONFIG_NETWORK_CONCURRENCY=1 \
+    NPM_CONFIG_MAXSOCKETS=1 \
     NODE_OPTIONS=--dns-result-order=ipv4first
 
 # Cache helps npm retry downloads without re-fetching the same tarballs.
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --no-progress --prefer-offline
+    npm ci --no-progress --prefer-offline --fetch-timeout=1200000 --fetch-retries=10
 
 COPY . .
 RUN npm run build
