@@ -1,4 +1,4 @@
-# Movie Logger - Entrega Pixel Breeders
+# Movie Logger - Entrega Técnica
 
 Aplicação de busca e avaliação de filmes integrada ao TMDB, com frontend em React + TypeScript, backend em FastAPI e execução completa via Docker Compose.
 
@@ -163,4 +163,4 @@ pytest tests -q
 
 ## Uso de IA
 
-A base foi scaffoldada com assistência de IA para acelerar a estrutura inicial e a organização de partes do código e da documentação. As decisões de arquitetura, os contratos de API e a validação da implementação foram revisados manualmente.
+Utilizei IA como ferramenta para acelerar o desenvolvimento, sempre sob minha supervisão. O Codex foi responsável por gerar grande parte do código a partir das especificações que eu definia, como arquitetura, contratos de API e requisitos de cada funcionalidade. Também utilizei o Claude para discutir algumas decisões de implementação e revisar soluções específicas. Todas as decisões de arquitetura, escopo e validação final ficaram por minha conta. A IA foi utilizada como ferramenta de apoio ao desenvolvimento, enquanto todas as decisões de arquitetura, implementação e validação permaneceram sob minha responsabilidade.
