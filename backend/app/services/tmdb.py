@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import date
 from math import ceil
 from threading import RLock
-from time import monotonic
+from time import monotonic, sleep
 from typing import Any, Literal
 
 import httpx
@@ -23,6 +23,8 @@ TMDB_SOURCE: Literal["tmdb"] = "tmdb"
 FIXTURE_SOURCE: Literal["fixture"] = "fixture"
 SearchSortMode = Literal["relevance", "recent", "rating", "title"]
 PAGE_SIZE = 20
+TMDB_RETRY_ATTEMPTS = 3
+TMDB_RETRY_BASE_DELAY_SECONDS = 0.25
 DISCOVER_SORT_BY: dict[SearchSortMode, str] = {
     "recent": "primary_release_date.desc",
     "rating": "vote_average.desc",
@@ -31,6 +33,10 @@ DISCOVER_SORT_BY: dict[SearchSortMode, str] = {
 
 
 class MovieNotFoundError(Exception):
+    pass
+
+
+class TmdbTransientError(Exception):
     pass
 
 
@@ -132,7 +138,7 @@ class TmdbClient:
         if full_cached is None:
             try:
                 full_cached = self._live_search_all(query=query, year=year, genre_id=genre_id, sort=sort)
-            except httpx.HTTPError as exc:
+            except (httpx.HTTPError, TmdbTransientError) as exc:
                 result = self._fixture_search_result(
                     query=query,
                     page=page,
@@ -170,12 +176,14 @@ class TmdbClient:
         }
         try:
             with httpx.Client(timeout=self.timeout) as client:
-                response = client.get(f"{self.base_url}/movie/{movie_id}", params=params)
-                if response.status_code == 404:
-                    raise MovieNotFoundError(f"Filme {movie_id} não encontrado.")
-                response.raise_for_status()
+                response = self._request_with_retry(
+                    client,
+                    f"/movie/{movie_id}",
+                    params,
+                    not_found_error=MovieNotFoundError(f"Filme {movie_id} não encontrado."),
+                )
                 data = response.json()
-        except httpx.HTTPError as exc:
+        except (httpx.HTTPError, TmdbTransientError) as exc:
             movie = get_fixture_movie(movie_id)
             if movie is None:
                 raise MovieNotFoundError(f"Filme {movie_id} não encontrado nos dados locais.")
@@ -283,9 +291,68 @@ class TmdbClient:
 
     def _request_json(self, endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
         with httpx.Client(timeout=self.timeout) as client:
-            response = client.get(f"{self.base_url}{endpoint}", params=params)
-            response.raise_for_status()
+            response = self._request_with_retry(client, endpoint, params)
             return response.json()
+
+    def _request_with_retry(
+        self,
+        client: httpx.Client,
+        endpoint: str,
+        params: dict[str, Any],
+        not_found_error: MovieNotFoundError | None = None,
+    ) -> httpx.Response:
+        last_error: Exception | None = None
+        for attempt in range(1, TMDB_RETRY_ATTEMPTS + 1):
+            try:
+                response = client.get(f"{self.base_url}{endpoint}", params=params)
+            except httpx.TransportError as exc:
+                last_error = exc
+                if attempt < TMDB_RETRY_ATTEMPTS:
+                    self._log_retry(endpoint, attempt, f"{exc.__class__.__name__}: {exc}")
+                    sleep(self._retry_delay(attempt))
+                    continue
+                raise TmdbTransientError(f"falha de conexão com a TMDB ({exc.__class__.__name__}: {exc})") from exc
+
+            if response.status_code == 404:
+                if not_found_error is not None:
+                    raise not_found_error
+                last_error = httpx.HTTPStatusError(
+                    "Erro não encontrado da TMDB",
+                    request=response.request,
+                    response=response,
+                )
+                raise last_error
+
+            if response.status_code == 429 or response.status_code >= 500:
+                last_error = httpx.HTTPStatusError(
+                    f"Erro transitório da TMDB ({response.status_code})",
+                    request=response.request,
+                    response=response,
+                )
+                if attempt < TMDB_RETRY_ATTEMPTS:
+                    self._log_retry(endpoint, attempt, f"status {response.status_code}")
+                    sleep(self._retry_delay(attempt))
+                    continue
+                raise TmdbTransientError(
+                    f"falha transitória na TMDB após {TMDB_RETRY_ATTEMPTS} tentativas (status {response.status_code})"
+                ) from last_error
+
+            response.raise_for_status()
+            return response
+
+        raise TmdbTransientError("falha transitória na TMDB.") from last_error
+
+    def _retry_delay(self, attempt: int) -> float:
+        return TMDB_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
+
+    def _log_retry(self, endpoint: str, attempt: int, reason: str) -> None:
+        logger.warning(
+            "TMDB retry em %s (tentativa %s/%s, motivo: %s)",
+            endpoint,
+            attempt,
+            TMDB_RETRY_ATTEMPTS,
+            reason,
+        )
 
     def _normalize_items(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [self._normalize_movie(item) for item in items]

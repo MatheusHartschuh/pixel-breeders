@@ -13,7 +13,7 @@ import { ptBR } from "../i18n";
 import type { MovieSummary, RatingRecord } from "../types";
 
 export function RatedPage() {
-  const { user, logout } = useAuth();
+  const { user, isCheckingSession, logout } = useAuth();
   const [ratings, setRatings] = useState<RatingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -26,6 +26,10 @@ export function RatedPage() {
   }, []);
 
   useEffect(() => {
+    if (isCheckingSession) {
+      return;
+    }
+
     if (!user) {
       setRatings([]);
       setLoading(false);
@@ -65,7 +69,7 @@ export function RatedPage() {
       });
 
     return () => controller.abort();
-  }, [user, logout]);
+  }, [user, isCheckingSession, logout]);
 
   function handleDeleteRequest(rating: RatingRecord) {
     if (!user) {
@@ -105,23 +109,30 @@ export function RatedPage() {
   const averageRating = ratings.length > 0 ? ratings.reduce((sum, rating) => sum + rating.rating, 0) / ratings.length : 0;
   const summary = user ? (
     <div className="collection-summary" aria-label={ptBR.rated.summary.ariaLabel}>
-      <span>
-        {ratings.length} {ptBR.rated.summary.filmsSuffix}
-      </span>
-      <span>
-        {ratings.length > 0
-          ? `${ptBR.rated.summary.averagePrefix} ${averageRating.toFixed(1)}/5`
-          : ptBR.rated.summary.noAverage}
-      </span>
-      <span>
-        {ratings[0]
-          ? `${ptBR.rated.summary.lastEntryPrefix} ${formatEvaluationDate(ratings[0].created_at)}`
-          : ptBR.rated.summary.noRecords}
-      </span>
+      <div className="collection-summary__item">
+        <span className="collection-summary__label">{ptBR.rated.summary.filmsLabel}</span>
+        <strong className="collection-summary__value">{ratings.length}</strong>
+      </div>
+      <div className="collection-summary__item">
+        <span className="collection-summary__label">{ptBR.rated.summary.averagePrefix}</span>
+        <strong className="collection-summary__value">
+          {ratings.length > 0 ? `${averageRating.toFixed(1)}/5.0` : ptBR.rated.summary.noAverage}
+        </strong>
+      </div>
+      <div className="collection-summary__item">
+        <span className="collection-summary__label">{ptBR.rated.summary.lastEntryPrefix}</span>
+        <strong className="collection-summary__value">
+          {ratings[0] ? formatEvaluationDate(ratings[0].created_at) : ptBR.rated.summary.noRecords}
+        </strong>
+      </div>
     </div>
   ) : null;
 
   const pageState = (() => {
+    if (isCheckingSession) {
+      return <RatedPageSkeleton />;
+    }
+
     if (!user) {
       return (
         <EmptyState
@@ -181,6 +192,7 @@ export function RatedPage() {
                 } satisfies MovieSummary
               }
               ratingDate={formatEvaluationDate(rating.created_at)}
+              showTmdbScore={false}
               actions={
                 <Button variant="text" className="text-button--danger" type="button" onClick={() => handleDeleteRequest(rating)}>
                   {ptBR.rated.actions.delete}

@@ -384,6 +384,7 @@ export function HomePage() {
     <section className="results-section">
       <DataSourceBanner source={dataSource} />
       <SectionHeader
+        className="home-results-heading"
         eyebrow={isInitialDiscovery ? HOME.section.initialEyebrow : HOME.section.resultsEyebrow}
         title={
           status === "loading"
@@ -391,8 +392,18 @@ export function HomePage() {
               ? HOME.section.loadingDiscovery
               : HOME.section.loadingSearch
             : isInitialDiscovery
-              ? `${resultCount} ${HOME.section.featuredCountSuffix}`
-              : `${resultCount} ${HOME.section.foundCountSuffix}`
+              ? (
+                  <>
+                    <span className="home-results-heading__count">{resultCount}</span>{" "}
+                    <span className="home-results-heading__suffix">{HOME.section.featuredCountSuffix}</span>
+                  </>
+                )
+              : (
+                  <>
+                    <span className="home-results-heading__count">{resultCount}</span>{" "}
+                    <span className="home-results-heading__suffix">{HOME.section.foundCountSuffix}</span>
+                  </>
+                )
         }
         titleAs="h2"
         actions={

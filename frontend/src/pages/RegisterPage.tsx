@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { AuthPageLayout } from "../components/auth/AuthPageLayout";
+import { AuthLoadingState } from "../components/auth/AuthLoadingState";
 import { Button } from "../components/ui/Button";
 import { Field } from "../components/ui/Field";
 import { useAuth } from "../auth/AuthProvider";
@@ -17,7 +18,7 @@ function getNextPath(search: string): string {
 export function RegisterPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { register, user } = useAuth();
+  const { register, user, isCheckingSession } = useAuth();
   const nextPath = getNextPath(location.search);
 
   const [username, setUsername] = useState("");
@@ -28,6 +29,10 @@ export function RegisterPage() {
   useEffect(() => {
     document.title = REGISTER.documentTitle;
   }, []);
+
+  if (isCheckingSession) {
+    return <AuthLoadingState title={ptBR.common.labels.loadingSession} description={ptBR.app.rail.validating} />;
+  }
 
   if (user) {
     return <Navigate to={nextPath} replace />;

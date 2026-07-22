@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -35,3 +35,6 @@ class Rating(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="ratings")
+
+
+ratings_user_updated_at_index = Index("ix_ratings_user_updated_at_desc", Rating.user_id, Rating.updated_at.desc())

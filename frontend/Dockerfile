@@ -26,9 +26,14 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 
+COPY nginx-root.conf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
+RUN mkdir -p /tmp/client_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp \
+    && chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /tmp
 
-EXPOSE 80
+USER nginx
 
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 8080
+
+ENTRYPOINT ["nginx", "-g", "daemon off;"]

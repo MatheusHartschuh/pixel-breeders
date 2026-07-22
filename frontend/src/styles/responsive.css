@@ -1,0 +1,175 @@
+@media (max-width: 1120px) {
+  .app-shell__frame {
+    grid-template-columns: 1fr;
+  }
+
+  .app-rail {
+    position: relative;
+    top: 0;
+    min-height: auto;
+  }
+
+  .app-rail__nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .app-rail__link {
+    min-height: 42px;
+  }
+
+  .app-rail__footer {
+    margin-top: 0;
+  }
+
+  .auth-page {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-card {
+    justify-self: start;
+  }
+
+  .movie-page__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .movie-page__poster-column {
+    position: relative;
+    top: 0;
+  }
+
+  .search-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-theme {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    padding-top: 12px;
+  }
+
+  .app-shell__frame {
+    width: min(var(--max-width), calc(100vw - 20px));
+    gap: 16px;
+  }
+
+  .app-rail {
+    padding: 18px;
+    gap: 18px;
+  }
+
+  .search-console {
+    padding: 18px;
+  }
+
+  .search-bar__row {
+    grid-template-columns: 1fr;
+    padding: 8px;
+    padding-left: 8px;
+  }
+
+  .search-bar__icon {
+    display: none;
+  }
+
+  .search-bar__input {
+    height: 44px;
+  }
+
+  .search-tools,
+  .movie-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .search-tools__footer {
+    justify-content: flex-start;
+  }
+
+  .pagination-controls {
+    justify-content: flex-start;
+  }
+
+  .pagination-controls__jump-form {
+    width: 100%;
+  }
+
+  .section-heading,
+  .movie-page__rating-top,
+  .panel__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .movie-page__layout {
+    gap: 22px;
+  }
+
+  .movie-page__header h1 {
+    font-size: clamp(2rem, 11vw, 3.5rem);
+  }
+
+  .movie-page__rating-panel,
+  .panel,
+  .auth-page__intro,
+  .search-console {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .data-source-banner {
+    padding: 12px 14px;
+  }
+
+  .auth-modal {
+    padding: 12px;
+  }
+
+  .auth-modal__panel {
+    padding: 20px;
+    border-radius: 24px;
+  }
+
+  .confirm-modal {
+    padding: 12px;
+  }
+
+  .confirm-modal__panel {
+    padding: 20px;
+    border-radius: 24px;
+  }
+
+  .genre-select__menu {
+    max-height: 280px;
+  }
+
+  .button,
+  .chip,
+  .segmented-control__button {
+    min-height: 42px;
+  }
+
+  .empty-state,
+  .search-intro {
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .skeleton::after {
+    animation: none;
+  }
+}

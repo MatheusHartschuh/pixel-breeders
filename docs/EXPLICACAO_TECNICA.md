@@ -45,7 +45,7 @@ Em `backend/app/main.py`, a aplicação:
 
 - instancia o `FastAPI`
 - configura o CORS
-- cria as tabelas com `Base.metadata.create_all(bind=engine)` no startup
+- cria as tabelas com `Base.metadata.create_all(bind=engine)` no `lifespan`
 - expõe `GET /health`
 - registra as rotas de busca, filmes, avaliações e autenticação
 
@@ -129,6 +129,7 @@ Regras importantes:
 - existe `ForeignKey` para `users.id`
 - há `ondelete="CASCADE"`
 - existe `UniqueConstraint("user_id", "tmdb_id")`
+- existe um índice composto em `user_id` + `updated_at desc` para acelerar a listagem de avaliações do usuário
 
 Essa restrição garante que um usuário não crie duas avaliações para o mesmo filme.
 
@@ -221,6 +222,19 @@ Características:
 
 Na prática, isso reduz chamadas repetidas quando o usuário pesquisa a mesma coisa, troca de página ou reabre um filme já consultado.
 
+#### Retry simples
+
+Antes de desistir da TMDB, o cliente tenta novamente algumas vezes em falhas transitórias, como timeout, erro de conexão, `429` e `5xx`.
+
+Características desse retry:
+
+- número pequeno de tentativas
+- backoff exponencial curto
+- logging explícito de cada nova tentativa
+- fallback local apenas depois de esgotar as tentativas
+
+Esse comportamento melhora a robustez sem mascarar falhas permanentes.
+
 #### Fallback local
 
 Se a TMDB estiver indisponível ou a chave não estiver configurada, a aplicação continua funcionando com `backend/app/fixtures.py`.
@@ -296,9 +310,12 @@ Detalhes importantes:
 - a sessão é lida de `localStorage` no estado inicial do provider
 - login e cadastro persistem `{ token, user }`
 - logout remove a sessão
-- `isCheckingSession` existe como API do provider, mas hoje não há um fluxo assíncrono de revalidação no boot
+- `isCheckingSession` sinaliza a validação assíncrona da sessão no boot
 
-Ou seja, a aplicação restaura a sessão local imediatamente, e só limpa o estado se uma rota protegida responder `401`.
+Quando o provider encontra uma sessão salva, ele chama `GET /api/auth/me` no carregamento inicial para confirmar se o token continua válido.
+Se a validação falhar, o estado local é limpo antes de o app seguir como autenticado.
+
+Ou seja, a aplicação restaura a sessão local imediatamente, mas também a revalida no boot para evitar confiar cegamente no `localStorage`.
 
 Os utilitários de navegação em `frontend/src/lib/navigation.ts` evitam open redirect e loops entre `/login` e `/register`.
 
@@ -469,6 +486,8 @@ O `docker-compose.yml` sobe três serviços:
 
 - gera a imagem a partir de `backend/Dockerfile`
 - recebe `DATABASE_URL` apontando para o PostgreSQL do Compose
+- expõe um healthcheck em `GET /health`, usado pelo Compose para confirmar que a API já subiu
+- roda como usuário não-root (`app`)
 - expõe a porta `8000`
 
 ### `frontend`
@@ -476,9 +495,13 @@ O `docker-compose.yml` sobe três serviços:
 - gera a imagem a partir de `frontend/Dockerfile`
 - usa Nginx para servir os arquivos estáticos
 - faz proxy de `/api/` para o backend
+- espera o backend estar saudável antes de iniciar
+- roda como usuário não-root (`nginx`)
 - expõe a porta `3000`
 
 Esse desenho permite que o navegador fale com a mesma origem em produção, o que simplifica a experiência final e reduz problemas de CORS.
+
+Os dois contextos de build também usam `.dockerignore` para cortar artefatos locais, caches e arquivos que não precisam entrar no build.
 
 ### Execução em um comando
 
@@ -520,12 +543,6 @@ Algumas escolhas foram intencionais para manter o escopo do MVP enxuto:
 - não há login social
 - não há migrações formais com Alembic
 - não há suíte completa de integração end-to-end
-- não há revalidação automática da sessão no boot do frontend
-
-Também existe um ponto técnico a evoluir no futuro:
-
-- `backend/app/main.py` ainda usa `@app.on_event("startup")`; o FastAPI já sinaliza essa abordagem como deprecada em favor de handlers de lifespan
-
 Nenhum desses pontos impede a entrega atual de cumprir o objetivo do teste.
 
 ## 7. Conclusão

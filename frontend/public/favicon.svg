@@ -4,8 +4,19 @@
       <stop offset="0%" stop-color="#1b1e22" />
       <stop offset="100%" stop-color="#111315" />
     </linearGradient>
+    <linearGradient id="panel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#252a31" />
+      <stop offset="100%" stop-color="#171a1e" />
+    </linearGradient>
+    <linearGradient id="stripe" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e6cf8f" />
+      <stop offset="100%" stop-color="#c8a96a" />
+    </linearGradient>
   </defs>
   <rect width="64" height="64" rx="18" fill="url(#bg)" />
-  <rect x="12" y="12" width="40" height="40" rx="12" fill="none" stroke="rgba(200,169,106,0.45)" stroke-width="2" />
-  <text x="32" y="37" text-anchor="middle" fill="#c8a96a" font-size="19" font-family="Georgia, 'Times New Roman', serif" font-weight="700" letter-spacing="1.2">PB</text>
+  <rect x="13" y="17" width="38" height="29" rx="8" fill="url(#panel)" stroke="rgba(200,169,106,0.38)" stroke-width="1.5" />
+  <path d="M13 24h38l-4 7H9l4-7Z" fill="url(#stripe)" />
+  <path d="M19 24l4-7h6l-4 7Zm12 0l4-7h6l-4 7Zm-18 0l4-7h4l-4 7Z" fill="rgba(17,19,21,0.8)" />
+  <rect x="20" y="29" width="24" height="13" rx="4" fill="none" stroke="rgba(230,207,143,0.7)" stroke-width="1.5" />
+  <path d="M30 32.2L36 35l-6 2.8Z" fill="#e6cf8f" />
 </svg>

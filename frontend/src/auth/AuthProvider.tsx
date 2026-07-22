@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useEffect, useContext, useState, type ReactNode } from "react";
 
-import { login as loginRequest, register as registerRequest } from "../api";
+import { getMe, login as loginRequest, register as registerRequest } from "../api";
 import type { AuthCredentials, AuthUser } from "../types";
 import { clearAuthSession, readAuthSession, writeAuthSession, type AuthSession } from "./storage";
 
@@ -28,8 +28,60 @@ function setSession(session: AuthSession | null, setSessionState: (value: AuthSe
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSessionState] = useState<AuthSession | null>(() => readAuthSession());
+  const [isCheckingSession, setIsCheckingSession] = useState(() => session !== null);
   const user = session?.user ?? null;
-  const isCheckingSession = false;
+  const bootToken = session?.token ?? null;
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function validateSession() {
+      if (session === null) {
+        setIsCheckingSession(false);
+        return;
+      }
+
+      setIsCheckingSession(true);
+
+      try {
+        const currentUser = await getMe();
+        if (!isActive) {
+          return;
+        }
+
+        setSessionState((currentSession) => {
+          if (currentSession === null || currentSession.token !== bootToken) {
+            return currentSession;
+          }
+
+          return { token: currentSession.token, user: currentUser };
+        });
+      } catch {
+        if (!isActive) {
+          return;
+        }
+
+        setSessionState((currentSession) => {
+          if (currentSession === null || currentSession.token !== bootToken) {
+            return currentSession;
+          }
+
+          clearAuthSession();
+          return null;
+        });
+      } finally {
+        if (isActive) {
+          setIsCheckingSession(false);
+        }
+      }
+    }
+
+    void validateSession();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   async function handleLogin(payload: AuthCredentials): Promise<AuthUser> {
     const response = await loginRequest(payload);

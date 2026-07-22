@@ -49,7 +49,6 @@ Estas decisões não foram implementadas porque não eram obrigatórias para o t
 - Login social / OAuth
 - Migrações formais com Alembic
 - Suíte completa de integração end-to-end cobrindo todos os fluxos
-- Revalidação automática da sessão no boot do frontend
 
 ## Como rodar com Docker
 
@@ -66,6 +65,8 @@ Depois de subir:
 - Healthcheck: http://localhost:8000/health
 
 Sem `TMDB_API_KEY`, a aplicação continua funcional com dados de exemplo e mostra um banner informando que os dados vêm do fallback local.
+O `docker compose` também espera o backend ficar saudável antes de subir o frontend, o que reduz falhas de inicialização no primeiro boot.
+As imagens de backend e frontend rodam sem `root`, e os diretórios de build usam `.dockerignore` para evitar contexto desnecessário.
 
 ## Como rodar localmente
 
@@ -146,14 +147,15 @@ pytest tests -q
 - O frontend nunca chama a TMDB diretamente
 - O backend decide se usa a API real ou os fixtures locais
 - Quando a chave está ativa, o backend cacheia as respostas de busca e detalhe por processo
+- O backend faz retry simples com backoff em falhas transitórias da TMDB antes de cair no fallback local
 - Quando a chave não está ativa, o app continua navegável, mas os pôsteres dos filmes de exemplo são gerados localmente como placeholders
 
 ## Observações sobre autenticação
 
 - A sessão é persistida em `localStorage`
-- O frontend restaura a sessão ao carregar a aplicação
+- O frontend restaura a sessão ao carregar a aplicação e revalida o token com `GET /api/auth/me`
 - Se uma rota protegida responder `401`, o estado local é limpo automaticamente
-- A aplicação não faz revalidação automática do token no boot
+- Se a validação do boot falhar, a sessão local é descartada antes de a UI seguir adiante
 
 ## Documentação interna
 

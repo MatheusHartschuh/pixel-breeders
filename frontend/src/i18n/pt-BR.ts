@@ -202,10 +202,10 @@ export const ptBR = {
     },
     summary: {
       ariaLabel: "Resumo da coleção",
-      filmsSuffix: "filmes",
-      averagePrefix: "Média",
+      filmsLabel: "Filmes",
+      averagePrefix: "Média:",
       noAverage: "Sem média ainda",
-      lastEntryPrefix: "Última entrada",
+      lastEntryPrefix: "Última entrada:",
       noRecords: "Sem registros",
     },
     states: {
@@ -233,7 +233,7 @@ export const ptBR = {
       tmdb: "TMDB",
       alreadyRated: "Já avaliado",
       notYetRated: "Ainda sem avaliação",
-      myRating: "Minha nota",
+      myRating: "Minha nota:",
       noRating: "Sem nota",
       ratingEyebrow: "Avaliação",
       synopsisEyebrow: "Sinopse",
@@ -301,7 +301,7 @@ export const ptBR = {
   },
   cards: {
     openMovieAria: (title: string) => `Abrir ${title}`,
-    userRatingPrefix: "Minha nota",
+    userRatingPrefix: "Minha nota:",
     ratedAtPrefix: "Avaliada em",
   },
   ratingStars: {
